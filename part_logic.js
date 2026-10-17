@@ -211,13 +211,34 @@ function scheduleBeat(t, step, intensity, lowHp) {
    advantages that make the next descent reach further. */
 const META_KEY = 'hollowdeep-meta';
 const META = { best: 0, echoes: 0, perks: {}, runs: 0, deepest: 1, wins: 0, reduceMotion: false, voice: true, music: true };
+/* a whole number at least `lo`, or the fallback if it is anything else */
+function metaNum(v, dflt, lo) {
+  const n = typeof v === 'number' ? v : parseFloat(v);
+  return Number.isFinite(n) ? Math.max(lo, Math.floor(n)) : dflt;
+}
 function loadMeta() {
   try {
     const raw = JSON.parse(localStorage.getItem(META_KEY) || '{}');
-    if (raw && typeof raw === 'object') for (const k in META) if (raw[k] !== undefined) META[k] = raw[k];
-    if (!META.perks || typeof META.perks !== 'object') META.perks = {};
+    if (raw && typeof raw === 'object') {
+      META.best = metaNum(raw.best, 0, 0);
+      META.echoes = metaNum(raw.echoes, 0, 0);
+      META.runs = metaNum(raw.runs, 0, 0);
+      META.wins = metaNum(raw.wins, 0, 0);
+      META.deepest = metaNum(raw.deepest, 1, 1);
+      /* only a real boolean counts: anything else leaves the default, and
+         null still means "has not been chosen yet" for reduced motion */
+      for (const k of ['voice', 'music']) if (typeof raw[k] === 'boolean') META[k] = raw[k];
+      if (typeof raw.reduceMotion === 'boolean' || raw.reduceMotion === null) META.reduceMotion = raw.reduceMotion;
+      META.perks = {};
+      if (raw.perks && typeof raw.perks === 'object') {
+        for (const p of PERKS) {
+          const lv = metaNum(raw.perks[p.id], 0, 0);
+          if (lv > 0) META.perks[p.id] = Math.min(p.max, lv);
+        }
+      }
+    }
     const old = parseInt(localStorage.getItem('hollowdeep-best') || '0', 10);
-    if (old > META.best) META.best = old;
+    if (Number.isFinite(old) && old > META.best) META.best = old;
   } catch (e) {}
 }
 function saveMeta() { try { localStorage.setItem(META_KEY, JSON.stringify(META)); } catch (e) {} }
@@ -1066,6 +1087,7 @@ function spawnFoe(type, x, y, elite) {
 /* ---------- effects ---------- */
 function burst(x, y, col, n, sp, life, kind) {
   if (reduceMotion) n = Math.max(1, Math.round(n * .4));
+  if (fxLevel) n = Math.max(1, Math.round(n * fxThin()));
   for (let i = 0; i < n; i++) {
     const a = rnd(0, TAU), v = rnd(.3, 1) * (sp || 80) / 60;
     G.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: rnd(.25, .6) * (life || 1), max: .6 * (life || 1), col, s: rnd(1.5, 3.5), k: kind || 'sq' });
@@ -2190,7 +2212,7 @@ function updateFx(dt) {
   for (const d of G.dying) d.t += dt; G.dying = G.dying.filter(d => d.t < .5);
   for (const f of G.fxs) f.t += dt; G.fxs = G.fxs.filter(f => f.t < (f.dur || .8));
   for (let i = G.parts.length - 1; i >= 0; i--) { const p = G.parts[i]; p.x += p.vx * k; p.y += p.vy * k; p.vx *= .94; p.vy *= .94; if (p.k === 'ember') p.vy -= .02 * k; else if (p.k === 'drip') p.vy += .06 * k; else if (p.k === 'coin') { p.vx *= .985 / .94; p.vy *= .985 / .94; p.z += p.vz * k; p.vz -= .36 * k; if (p.z < 0) { p.z = 0; p.vz = -p.vz * .45; if (p.vz < .7) p.vz = 0; } } p.life -= dt; if (p.life <= 0) G.parts.splice(i, 1); }
-  const cap = reduceMotion ? 450 : 1400;
+  const cap = Math.round((reduceMotion ? 450 : 1400) * fxThin());
   if (G.parts.length > cap) G.parts.splice(0, G.parts.length - cap);
   for (let i = G.texts.length - 1; i >= 0; i--) { const t = G.texts[i]; t.y -= 24 * dt; t.life -= dt; if (t.life <= 0) G.texts.splice(i, 1); }
   for (let i = G.timers.length - 1; i >= 0; i--) { const q = G.timers[i]; q.t -= dt; if (q.t <= 0) { G.timers.splice(i, 1); try { q.fn(); } catch (e) {} } }
@@ -3471,6 +3493,26 @@ const mini = $('mini'), mctx = mini.getContext('2d');
 let W = 0, H = 0, DPR = 1, Z = 1;
 const cam = { x: 0, y: 0 }, keys = {}, mouse = { x: 0, y: 0, down: false, last: -1e9 }, touch = { move: null, aim: null };
 let spTouch = false, dashTouch = false, bombTouch = false, btnsOn = false, clock = 0, reduceMotion = false;
+/* 0 = draw everything, 1 = thinned, 2 = sparse. Raised only by sustained slow
+   frames and lowered again by sustained quick ones, with a wide gap between
+   the two so it cannot flutter between levels. */
+let fxLevel = 0;
+const PERF = { ring: [], at: 0, hold: 0, n: 90 };
+function perfTick(ms) {
+  if (G.state !== 'play') return;          /* menus and overlays are not the game */
+  const p = PERF;
+  p.ring[p.at++ % p.n] = ms;
+  if (p.ring.length < p.n) return;
+  p.hold -= 1;
+  if (p.hold > 0) return;
+  const s = p.ring.slice().sort((a, b) => a - b), med = s[s.length >> 1];
+  /* 22ms is about 45fps: slower than that and the drop is worth more than
+     the particles. 11ms leaves room to climb back without immediately
+     falling over again. */
+  if (med > 22 && fxLevel < 2) { fxLevel++; p.hold = p.n * 3; }
+  else if (med < 11 && fxLevel > 0) { fxLevel--; p.hold = p.n * 3; }
+}
+const fxThin = () => fxLevel === 0 ? 1 : fxLevel === 1 ? .5 : .25;
 const C = { floorA: '#1a1f2c', floorB: '#1d2333', speck: '#262d40', wall: '#2c3447', wallHi: '#3b455d', face: '#11141c', void: '#0a0c11', door: '#7a4e2a', amber: '#f0a23c', blood: '#d9534f', bone: '#ebe4d2', cyan: '#8fd3ff' };
 
 function resize() {
@@ -4082,7 +4124,18 @@ function chooseUp(i) {
 
 /* ---------- loop ---------- */
 let last = performance.now(), overShown = false, wasPlaying = false;
+let frameErrs = 0;
+function frameError(e) {
+  if (frameErrs++ < 3 && typeof console !== 'undefined' && console.error) {
+    console.error('Hollowdeep: a frame failed and was skipped', e);
+    if (frameErrs === 3) console.error('Hollowdeep: further frame errors will not be reported');
+  }
+}
 function frame(now) {
+  /* before anything that could throw, so a bad frame costs a frame */
+  requestAnimationFrame(frame);
+  const _t0 = performance.now();
+  try {
   const dt = Math.min(.05, (now - last) / 1000); last = now; clock += dt;
   musicTick();
   const playing = G.state === 'play' || G.state === 'offer' || G.state === 'clear';
@@ -4103,7 +4156,8 @@ function frame(now) {
     } }
   if (G.state === 'offer' && !lootShown) { lootShown = true; showLoot(); } else if (G.state !== 'offer' && lootShown) { lootShown = false; $('loot').hidden = true; }
   if (W && H && G.map) { if (G.state === 'play' || G.state === 'offer' || G.state === 'shop' || G.state === 'clear') updateHud(); render(); }
-  requestAnimationFrame(frame);
+  } catch (e) { frameError(e); }
+  perfTick(performance.now() - _t0);
 }
 loadMeta(); G.best = META.best || 0;
 { /* a trophy line, once there is something to show */

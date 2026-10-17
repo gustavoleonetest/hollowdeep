@@ -60,7 +60,18 @@ globalThis.Image = class {
   get src() { return this._src; }
 };
 globalThis.requestAnimationFrame = () => 0;
-globalThis.localStorage = { getItem: () => null, setItem() {} };
+/* a real in-memory store: a no-op one cannot exercise saving or loading */
+globalThis.localStorage = (() => {
+  const m = new Map();
+  return {
+    getItem: k => (m.has(String(k)) ? m.get(String(k)) : null),
+    setItem: (k, v) => { m.set(String(k), String(v)); },
+    removeItem: k => { m.delete(String(k)); },
+    clear: () => m.clear(),
+    key: i => [...m.keys()][i] ?? null,
+    get length() { return m.size; },
+  };
+})();
 if (!globalThis.performance) globalThis.performance = { now: () => Date.now() };
 
 /* sprite metadata: same keys as the real atlases, no image data */

@@ -13,6 +13,7 @@ hand-edited) and part_logic.js (all the game code).
 """
 import io
 import os
+import re
 import subprocess
 import sys
 
@@ -131,7 +132,14 @@ def test():
     for name in ('behave', 'behave2'):
         print(name)
         code, out = node(name + '.js', show=1)
-        ok &= 'FAILURES' not in out
+        """A crash prints no FAILURES line, so absence of one proved nothing.
+        Require the tally, and require it to be complete."""
+        m = re.search(r'(\d+)/(\d+) checks passed', out)
+        good = code == 0 and m is not None and m.group(1) == m.group(2) and 'FAILURES' not in out
+        if not good:
+            print('   ' + ('no result line: the suite did not finish' if not m
+                           else 'exit %d' % code))
+        ok &= good
 
     print('\n' + ('ALL GREEN' if ok else 'SOMETHING FAILED'))
     return 0 if ok else 1

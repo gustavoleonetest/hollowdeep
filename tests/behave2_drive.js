@@ -9,6 +9,19 @@ startGame(['bulwark']);
 G.level = 6; genLevel(); clearOffers();
 let P = G.players[0];
 
+/* Measuring the drain, or the stairs rule, means nothing else may touch the
+   player: food heals, foes hit, a chest raises a card and update returns
+   before the rule under test ever runs. */
+function bareFloor() {
+  G.enemies.length = 0; G.nests.length = 0; G.hazards.length = 0;
+  G.eshots.length = 0; G.shots.length = 0; G.items.length = 0; G.zones.length = 0;
+  G.hitstop = 0; G.winPending = false; G.offer = null; G.offerQ.length = 0;
+  /* the stairs room can itself be an arena room: stepping onto the exit then
+     starts the arena, which moves the delvers out of it entirely */
+  G.event = null;
+  for (const r of (G.rooms || [])) r.eventDone = true;
+  for (const p of G.players) { p.down = false; p.inv = 1e9; p.kx = 0; p.ky = 0; p.dash = 0; }
+}
 /* ---------------- Diablo: rolled gear ---------------- */
 const seenNames = new Set(), rarCount = {};
 let affOk = true, labelOk = true;
@@ -499,7 +512,18 @@ ok('depth one always has a potion to teach it', G.items.some(i => i.kind === 'bo
   /* shards: thrown out, then called back */
   { const [B, Q] = bossIn('obsidian'); Q.inv = 1e9;
     B.st = 'shards'; bossAct(B);
-    const mine = G.eshots.slice();
+    /* a cramped room eats every shard on a wall before the recall, which says
+       nothing about whether they come back: keep looking for a room with room */
+    let mine = G.eshots.slice();
+    for (let attempt = 0; attempt < 12 && mine.length; attempt++) {
+      let alive = 0;
+      const probe = mine.map(s2 => ({ s2, x: s2.x, y: s2.y, vx: s2.vx, vy: s2.vy }));
+      for (let i = 0; i < 52; i++) updateShots(1 / 60);
+      alive = mine.filter(s2 => G.eshots.indexOf(s2) >= 0).length;
+      for (const q of probe) { q.s2.x = q.x; q.s2.y = q.y; q.s2.vx = q.vx; q.s2.vy = q.vy; q.s2.life = 3.4; if (G.eshots.indexOf(q.s2) < 0) G.eshots.push(q.s2); }
+      if (alive >= 3) break;
+      const b2 = bossIn('obsidian'); b2[0].st = 'shards'; bossAct(b2[0]); mine = G.eshots.slice();
+    }
     ok('the obsidian throws a ring of shards', mine.length >= 8, mine.length + ' shards');
     const out = new Map(mine.map(s => [s, { x: s.vx, y: s.vy }]));
     /* the recall sits on a timer, and timers only tick in updateFx, so both
@@ -1022,8 +1046,9 @@ ok('every omen names itself and says why', OMENS.every(o => o.id && o.name && o.
 
 /* the clock: the one thing an omen must never break */
 { const rate = (id) => underOmen(id, 8, (P) => {
+    bareFloor();
     P.hp = P.max; const h0 = P.hp;
-    for (let i = 0; i < 120; i++) { P.inv = 999; update(1 / 60); }
+    for (let i = 0; i < 120; i++) { P.inv = 1e9; update(1 / 60); }
     return h0 - P.hp;
   });
   const plain = rate(null), famine = rate('famine'), still = rate('still');
@@ -1269,7 +1294,7 @@ A.hp = 1; A.inv = 0; downPlayer(A);
 ok('one down does not end the run', G.state === 'play' && A.down === true);
 ok('and the other still stands', !B.down);
 
-/* the fallen one can be revived by standing over them */
+/* and a partner standing over them can bring them back */
 B.x = A.x + 6; B.y = A.y;
 for (let i = 0; i < 180 && A.down; i++) updateRevive(1 / 60);
 ok('a partner can raise the fallen', A.down === false, 'hp=' + Math.round(A.hp));
@@ -1278,39 +1303,223 @@ ok('a partner can raise the fallen', A.down === false, 'hp=' + Math.round(A.hp))
 A.inv = 0; B.inv = 0; downPlayer(A); downPlayer(B);
 ok('both down ends the run', G.state === 'dead');
 
-/* the stairs wait for the second delver */
+/* The stairs rule lives at the end of update: every delver still standing has
+   to be within reach of the exit. Drive it a frame at a time in a bare room,
+   rather than simulating two hundred and letting everything else in the game
+   decide the answer. */
 startGame(['ember', 'thistle']); G.level = 3; genLevel();
 g = 0; while (G.offer && g++ < 20) applyUpgrade(0); G.offerQ.length = 0; G.state = 'play';
 const [P1, P2] = G.players;
-G.keys = 9;
-P1.x = G.exit.x; P1.y = G.exit.y; P2.x = G.exit.x + 600; P2.y = G.exit.y;
 const lvl0 = G.level;
-for (let i = 0; i < 120; i++) update(1 / 60);
-ok('one delver alone does not take the stairs', G.level === lvl0, 'depth ' + G.level);
-/* both inside the exit radius but not on the same spot: two delvers stacked
-   get pushed apart, and one drifting out stops the stairs counting */
-for (let i = 0; i < 200 && G.state === 'play'; i++) {
-  P1.x = G.exit.x - 6; P1.y = G.exit.y; P1.kx = 0; P1.ky = 0;
-  P2.x = G.exit.x + 6; P2.y = G.exit.y; P2.kx = 0; P2.ky = 0;
-  update(1 / 60);
-}
+G.keys = 9;
+const clear = () => { bareFloor(); for (const p of G.players) p.hp = p.max; };
+const put = (p, dx) => { p.x = G.exit.x + dx; p.y = G.exit.y; };
+
+clear(); put(P1, -6); put(P2, 600);
+update(1 / 60);
+ok('one delver alone does not take the stairs', G.state === 'play', G.state);
+
+clear(); put(P1, -6); put(P2, 6);
+update(1 / 60);
 ok('both on the stairs clears the depth', G.state === 'clear', G.state);
-/* a beat of celebration, then the stall */
+
 for (let i = 0; i < 200 && G.state === 'clear'; i++) clearTick(1 / 60);
 ok('and the stall follows', G.state === 'shop', G.state);
 if (G.state === 'shop') { renderShop(); leaveShop(); }
 ok('and leaving it descends', G.level > lvl0, 'depth ' + lvl0 + ' -> ' + G.level);
 ok('both delvers come down together', G.players.filter(p => !p.down).length === 2);
 
-/* offers must be answerable for each delver, not just the first */
+/* a fallen partner must not hold the stairs: the living ones decide */
+g = 0; while (G.offer && g++ < 20) applyUpgrade(0); G.offerQ.length = 0; G.state = 'play';
+G.keys = 9;
+clear(); put(P1, -6); P2.down = true; P2.x = G.exit.x + 600; P2.y = G.exit.y;
+update(1 / 60);
+ok('a fallen partner does not hold the stairs', G.state === 'clear', G.state);
+G.state = 'play';
+
+/* an offer belongs to one delver, and must land on that one */
 startGame(['bulwark', 'sable']); G.level = 5; genLevel(); G.offerQ.length = 0; G.offer = null;
 queueOffer({ kind: 'up', P: G.players[1], opts: rollOffer(false) });
 ok('an offer can belong to the second delver', G.offer && G.offer.P === G.players[1]);
-const d0 = G.players[1].dmgMul, e0 = G.players[0].dmgMul;
+const second0 = G.players[1].dmgMul, first0 = G.players[0].dmgMul;
 applyUpgrade(0);
-ok('and it applies to that delver', G.players[1].dmgMul !== d0 || G.players[1].plvl > 0);
-ok('not to the first', G.players[0].dmgMul === e0);
+ok('and it applies to that delver', G.players[1].dmgMul !== second0 || G.players[1].plvl > 0);
+ok('not to the first', G.players[0].dmgMul === first0);
+}
 
+/* ---------------- it thins itself on a slow device ---------------- */
+{
+  const resetPerf = () => { fxLevel = 0; PERF.ring.length = 0; PERF.at = 0; PERF.hold = 0; };
+  const feed = (ms, frames) => { for (let i = 0; i < frames; i++) perfTick(ms); };
+
+  startGame(['sable']); G.level = 3; genLevel();
+  let gg = 0; while (G.offer && gg++ < 20) applyUpgrade(0); G.offerQ.length = 0; G.state = 'play';
+
+  resetPerf();
+  ok('a quick device draws everything', fxLevel === 0 && fxThin() === 1);
+
+  feed(40, PERF.n * 2);
+  ok('sustained slow frames thin the decoration', fxLevel > 0, 'level ' + fxLevel);
+  const thinned = fxLevel;
+  feed(40, PERF.n * 6);
+  ok('and it keeps stepping down while it struggles', fxLevel > thinned || fxLevel === 2, 'level ' + fxLevel);
+  ok('but never past the floor', fxLevel <= 2, 'level ' + fxLevel);
+
+  feed(3, PERF.n * 8);
+  ok('and climbs back when the device keeps up', fxLevel === 0, 'level ' + fxLevel);
+
+  /* a couple of slow frames in a row is a hitch, not a slow device */
+  resetPerf();
+  feed(4, PERF.n);
+  const before = fxLevel;
+  for (let i = 0; i < 5; i++) perfTick(60);
+  ok('a brief hitch is not treated as a slow device', fxLevel === before, 'level ' + fxLevel);
+
+  /* and it must not flutter between levels frame to frame */
+  resetPerf();
+  let changes = 0, prev = fxLevel;
+  for (let i = 0; i < PERF.n * 10; i++) { perfTick(i % 2 ? 40 : 3); if (fxLevel !== prev) { changes++; prev = fxLevel; } }
+  ok('it cannot flutter between levels', changes <= 3, changes + ' changes over ' + (PERF.n * 10) + ' frames');
+
+  /* menus are not the game, and must not be measured */
+  resetPerf(); G.state = 'menu';
+  feed(80, PERF.n * 4);
+  ok('a slow menu does not thin the game', fxLevel === 0, 'level ' + fxLevel);
+  G.state = 'play';
+
+  /* what it changes is decoration, and only decoration */
+  resetPerf();
+  G.parts.length = 0; burst(100, 100, '#fff', 40, 100);
+  const full = G.parts.length;
+  fxLevel = 2;
+  G.parts.length = 0; burst(100, 100, '#fff', 40, 100);
+  const sparse = G.parts.length;
+  ok('thinning means fewer particles', sparse < full, full + ' -> ' + sparse);
+  ok('but never none at all', sparse > 0, sparse);
+
+  /* the simulation must not notice */
+  resetPerf();
+  startGame(['thistle']); G.level = 4; genLevel();
+  gg = 0; while (G.offer && gg++ < 20) applyUpgrade(0); G.offerQ.length = 0; G.state = 'play';
+  const snap = () => ({ foes: G.enemies.length, crypts: G.nests.length, items: G.items.length,
+                        hp: Math.round(G.players[0].hp), props: G.props.length });
+  fxLevel = 0; const a0 = snap();
+  fxLevel = 2; const a2 = snap();
+  ok('thinning changes nothing the game runs on',
+     JSON.stringify(a0) === JSON.stringify(a2), JSON.stringify(a2));
+  { const P = G.players[0];
+    bareFloor();
+    fxLevel = 2; P.hp = P.max; const h0 = P.hp;
+    for (let i = 0; i < 60; i++) { P.inv = 1e9; update(1 / 60); }
+    const lost2 = h0 - P.hp;
+    bareFloor();
+    fxLevel = 0; P.hp = h0;
+    for (let i = 0; i < 60; i++) { P.inv = 1e9; update(1 / 60); }
+    const lost0 = h0 - P.hp;
+    ok('and the clock runs at the same rate either way', Math.abs(lost2 - lost0) < 1.5,
+       lost0.toFixed(1) + ' vs ' + lost2.toFixed(1) + ' health in a second'); }
+  fxLevel = 0;
+}
+
+/* ---------------- saved progress survives being wrong ---------------- */
+{
+  const put = (o) => localStorage.setItem(META_KEY, typeof o === 'string' ? o : JSON.stringify(o));
+  const keep = localStorage.getItem(META_KEY);
+
+  /* numbers that arrived as strings used to make the next payout concatenate:
+     "40" + 67 became "4067", written back, growing every run */
+  put({ echoes: '40', best: '900', runs: '7', wins: '2', deepest: '9' });
+  loadMeta();
+  ok('a number saved as text is read as a number', typeof META.echoes === 'number', typeof META.echoes + ' ' + META.echoes);
+  ok('and keeps its value', META.echoes === 40 && META.best === 900 && META.deepest === 9,
+     META.echoes + '/' + META.best + '/' + META.deepest);
+  { const e0 = META.echoes;
+    G.won = false; G.gold = 0; G.score = 0; G.level = 2; bankRun();
+    ok('so banking a run adds rather than concatenates', typeof META.echoes === 'number' && META.echoes > e0,
+       e0 + ' -> ' + META.echoes); }
+
+  put({ echoes: 'lots', best: null, deepest: 'deep', wins: NaN });
+  loadMeta();
+  ok('nonsense falls back to a sane default',
+     META.echoes === 0 && META.best === 0 && META.deepest === 1 && META.wins === 0,
+     [META.echoes, META.best, META.deepest, META.wins].join('/'));
+
+  put({ echoes: -500, wins: -3, deepest: -9, runs: -1 });
+  loadMeta();
+  ok('negatives cannot be saved in', META.echoes >= 0 && META.wins >= 0 && META.deepest >= 1 && META.runs >= 0,
+     [META.echoes, META.wins, META.deepest, META.runs].join('/'));
+
+  put({ echoes: 12.7 });
+  loadMeta();
+  ok('and a fraction becomes a whole number', Number.isInteger(META.echoes), String(META.echoes));
+
+  /* perk levels drive array maths and pricing, so they have to be whole and capped */
+  put({ perks: { vigour: '2', slow: 99, flask: 'x', nonsense: 4, purse: -2 } });
+  loadMeta();
+  ok('a perk level saved as text still counts', perkLv('vigour') === 2, String(perkLv('vigour')));
+  ok('and cannot exceed its cap', perkLv('slow') === PERKS.find(p => p.id === 'slow').max, String(perkLv('slow')));
+  ok('an unreadable level is simply zero', perkLv('flask') === 0, String(perkLv('flask')));
+  ok('a negative one too', perkLv('purse') === 0, String(perkLv('purse')));
+  ok('and an unknown perk is dropped', META.perks.nonsense === undefined);
+  ok('every kept level is a whole number', Object.keys(META.perks).every(k => Number.isInteger(META.perks[k])),
+     JSON.stringify(META.perks));
+
+  put('{ this is not json');
+  loadMeta();
+  ok('a torn save does not throw', typeof META.echoes === 'number');
+
+  put({ perks: 'not an object' });
+  loadMeta();
+  ok('and neither does a perks field that is not one', META.perks && typeof META.perks === 'object');
+
+  /* the price of a perk has to stay a real number whatever was loaded */
+  ok('perk prices stay finite', PERKS.every(p => Number.isFinite(perkCost(p))));
+
+  if (keep === null) localStorage.removeItem(META_KEY); else localStorage.setItem(META_KEY, keep);
+  loadMeta();
+}
+
+/* ---------------- one bad frame does not end the game ---------------- */
+{
+  /* the loop used to schedule the next frame last, so anything that threw
+     stopped it for good and the game froze on its final image */
+  startGame(['sable']); G.level = 3; genLevel();
+  let gg = 0; while (G.offer && gg++ < 20) applyUpgrade(0); G.offerQ.length = 0; G.state = 'play';
+
+  let scheduled = 0;
+  const realRaf = globalThis.requestAnimationFrame;
+  globalThis.requestAnimationFrame = () => { scheduled++; return 1; };
+  const realRender = render, errs0 = frameErrs;
+  /* the throw here is deliberate, so keep its report out of the suite output */
+  const realErr0 = console.error;
+  console.error = () => {};
+  let threw = false;
+  try {
+    render = () => { throw new Error('a frame blew up'); };
+    frame(performance.now());
+    frame(performance.now());
+  } catch (e) { threw = true; }
+  finally { render = realRender; globalThis.requestAnimationFrame = realRaf; console.error = realErr0; }
+
+  ok('a throwing frame does not escape the loop', !threw);
+  ok('and the next frame is still scheduled', scheduled >= 2, scheduled + ' scheduled');
+  ok('the failure is reported rather than swallowed', frameErrs > errs0, (frameErrs - errs0) + ' reported');
+
+  /* and it must stop shouting once it has made the point: a fault every
+     frame would otherwise bury the console and slow the page further */
+  frameErrs = 0;
+  let logged = 0;
+  const realErr = console.error;
+  console.error = () => { logged++; };
+  globalThis.requestAnimationFrame = () => 1;
+  try { render = () => { throw new Error('again'); }; for (let i = 0; i < 60; i++) frame(performance.now()); }
+  finally { render = realRender; globalThis.requestAnimationFrame = realRaf; console.error = realErr; }
+  ok('it stops reporting after the first few', logged > 0 && logged <= 4, logged + ' lines for 60 bad frames');
+
+  /* the game is still playable afterwards */
+  const P = G.players[0], h0 = P.hp;
+  for (let i = 0; i < 30; i++) update(1 / 60);
+  ok('and the game still runs after a bad frame', P.hp !== h0 || G.state === 'play', G.state);
 }
 
 const fails = results.filter(r => r[0] === 'FAIL');
