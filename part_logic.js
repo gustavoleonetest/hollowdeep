@@ -4093,6 +4093,14 @@ function frame(now) {
   if ((G.state === 'dead' || G.state === 'won') && !overShown) { overShown = true; showOver(); }
   if (G.state !== 'dead' && G.state !== 'won') overShown = false;
   if (G.state === 'shop' && !shopShown) showShop(); else if (G.state !== 'shop' && shopShown) { shopShown = false; $('shop').hidden = true; if (G.state === 'play') $('hud').hidden = false; }
+  /* the touch buttons and the minimap belong to play, and the HUD already
+     knows when that is */
+  { const st = $('stage'), on = !$('hud').hidden;
+    if (st && st.classList && st.dataset.play !== (on ? '1' : '0')) {
+      st.dataset.play = on ? '1' : '0';
+      st.classList.toggle('playing', on);
+      if (document.body && document.body.classList) document.body.classList.toggle('playing', on);
+    } }
   if (G.state === 'offer' && !lootShown) { lootShown = true; showLoot(); } else if (G.state !== 'offer' && lootShown) { lootShown = false; $('loot').hidden = true; }
   if (W && H && G.map) { if (G.state === 'play' || G.state === 'offer' || G.state === 'shop' || G.state === 'clear') updateHud(); render(); }
   requestAnimationFrame(frame);

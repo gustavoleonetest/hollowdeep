@@ -1254,6 +1254,65 @@ ok('every omen names itself and says why', OMENS.every(o => o.id && o.name && o.
     ok('and it is gone once unlocked', !drawn()['gate']); }
 }
 
+/* ---------------- two delvers, one keyboard ---------------- */
+{
+startGame(['bulwark', 'sable']);
+ok('two delvers start together', G.players.length === 2, G.players.map(p => p.cls.name).join(' + '));
+ok('co-op is flagged', G.co === true);
+G.level = 4; genLevel();
+let g = 0; while (G.offer && g++ < 20) applyUpgrade(0); G.offerQ.length = 0; G.state = 'play';
+ok('both are placed on open floor', G.players.every(p => openAt(p.x, p.y) && !blockedAt(p.x, p.y, 11)));
+
+/* one falling must not end the run */
+const [A, B] = G.players;
+A.hp = 1; A.inv = 0; downPlayer(A);
+ok('one down does not end the run', G.state === 'play' && A.down === true);
+ok('and the other still stands', !B.down);
+
+/* the fallen one can be revived by standing over them */
+B.x = A.x + 6; B.y = A.y;
+for (let i = 0; i < 180 && A.down; i++) updateRevive(1 / 60);
+ok('a partner can raise the fallen', A.down === false, 'hp=' + Math.round(A.hp));
+
+/* both down ends it */
+A.inv = 0; B.inv = 0; downPlayer(A); downPlayer(B);
+ok('both down ends the run', G.state === 'dead');
+
+/* the stairs wait for the second delver */
+startGame(['ember', 'thistle']); G.level = 3; genLevel();
+g = 0; while (G.offer && g++ < 20) applyUpgrade(0); G.offerQ.length = 0; G.state = 'play';
+const [P1, P2] = G.players;
+G.keys = 9;
+P1.x = G.exit.x; P1.y = G.exit.y; P2.x = G.exit.x + 600; P2.y = G.exit.y;
+const lvl0 = G.level;
+for (let i = 0; i < 120; i++) update(1 / 60);
+ok('one delver alone does not take the stairs', G.level === lvl0, 'depth ' + G.level);
+/* both inside the exit radius but not on the same spot: two delvers stacked
+   get pushed apart, and one drifting out stops the stairs counting */
+for (let i = 0; i < 200 && G.state === 'play'; i++) {
+  P1.x = G.exit.x - 6; P1.y = G.exit.y; P1.kx = 0; P1.ky = 0;
+  P2.x = G.exit.x + 6; P2.y = G.exit.y; P2.kx = 0; P2.ky = 0;
+  update(1 / 60);
+}
+ok('both on the stairs clears the depth', G.state === 'clear', G.state);
+/* a beat of celebration, then the stall */
+for (let i = 0; i < 200 && G.state === 'clear'; i++) clearTick(1 / 60);
+ok('and the stall follows', G.state === 'shop', G.state);
+if (G.state === 'shop') { renderShop(); leaveShop(); }
+ok('and leaving it descends', G.level > lvl0, 'depth ' + lvl0 + ' -> ' + G.level);
+ok('both delvers come down together', G.players.filter(p => !p.down).length === 2);
+
+/* offers must be answerable for each delver, not just the first */
+startGame(['bulwark', 'sable']); G.level = 5; genLevel(); G.offerQ.length = 0; G.offer = null;
+queueOffer({ kind: 'up', P: G.players[1], opts: rollOffer(false) });
+ok('an offer can belong to the second delver', G.offer && G.offer.P === G.players[1]);
+const d0 = G.players[1].dmgMul, e0 = G.players[0].dmgMul;
+applyUpgrade(0);
+ok('and it applies to that delver', G.players[1].dmgMul !== d0 || G.players[1].plvl > 0);
+ok('not to the first', G.players[0].dmgMul === e0);
+
+}
+
 const fails = results.filter(r => r[0] === 'FAIL');
 for (const [st, n, x] of results) console.log(st + '  ' + n + (x ? '  [' + x + ']' : ''));
 console.log('\n' + (results.length - fails.length) + '/' + results.length + ' checks passed');

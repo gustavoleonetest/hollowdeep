@@ -48,15 +48,24 @@ body{
 .fill.dash{background:var(--cyan); transition:none}
 .fill.sp{background:#6b6f7c; transition:none}
 #spBtn{display:none; position:absolute; right:84px; bottom:calc(min(156px,30vw)*.73 + 22px); width:64px; height:64px; border-radius:50%; border:1px solid var(--gold,#f0a23c); background:rgba(12,14,19,.7); color:var(--gold,#f0a23c); font:600 11px var(--mono); letter-spacing:.08em}
-@media (pointer:coarse){#spBtn{display:block}}
+@media (pointer:coarse){#stage.playing #spBtn{display:block}}
 #bombBtn{display:none; position:absolute; right:10px; bottom:calc(min(156px,30vw)*.73 + 94px); width:64px; height:64px; border-radius:50%; border:1px solid #b98cff; background:rgba(12,14,19,.7); color:#b98cff; font:600 11px var(--mono); letter-spacing:.08em}
-@media (pointer:coarse){#bombBtn{display:block}}
+@media (pointer:coarse){#stage.playing #bombBtn{display:block}}
 .stats{display:flex; flex-wrap:wrap; gap:4px 14px; font-size:13px; font-variant-numeric:tabular-nums; min-width:0}
 @media (max-width:520px){.stats{gap:3px 10px; font-size:12px}.hp{width:min(200px,54vw)}}
 .stats b{font-weight:600; color:var(--torch)}
+#stage:not(.playing) #mini{display:none}
 #mini{position:absolute; right:10px; bottom:10px; width:min(156px,30vw); height:auto; background:rgba(12,14,19,.74); border:1px solid var(--line); image-rendering:pixelated; pointer-events:none}
 #dashBtn{display:none; position:absolute; right:10px; bottom:calc(min(156px,30vw)*.73 + 22px); width:64px; height:64px; border-radius:50%; border:1px solid var(--cyan); background:rgba(12,14,19,.7); color:var(--cyan); font:600 11px var(--mono); letter-spacing:.08em}
-@media (pointer:coarse){#dashBtn{display:block}}
+@media (pointer:coarse){#stage.playing #dashBtn{display:block}}
+.touchhelp{display:none}
+@media (pointer:coarse){
+  .kbdhelp{display:none}
+  .touchhelp{display:block}
+  /* once you are playing you have read it, and the screen is small */
+  body.playing .touchhelp{display:none}
+  body.playing .bar{padding-bottom:2px}
+}
 .overlay{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:16px; overflow:auto; background:rgba(6,8,12,.66)}
 .overlay[hidden],[hidden]{display:none!important}
 .sheet{width:100%; max-width:780px; margin:auto; display:grid; gap:14px}
@@ -99,7 +108,8 @@ body{
 </style>
 <div class="bar">
   <h1>Hollowdeep</h1>
-  <p><kbd>WASD</kbd> move · <kbd>mouse</kbd> aim · <kbd>click</kbd>/<kbd>Space</kbd> attack · <kbd>Shift</kbd> dash · <kbd>E</kbd> special · <kbd>F</kbd> potion · <kbd>P</kbd> pause · <kbd>M</kbd> mute · <kbd>V</kbd> narrator · <kbd>N</kbd> music · gamepad: sticks move and aim, triggers fight · Co-op P2: <kbd>arrows</kbd>, <kbd>Enter</kbd> attack, <kbd>Right Shift</kbd> dash, <kbd>Right Ctrl</kbd> special, <kbd>Right Alt</kbd> potion</p>
+  <p class="touchhelp">Left half of the screen moves you · right half aims and attacks · the buttons are dash, special and potion</p>
+  <p class="kbdhelp"><kbd>WASD</kbd> move · <kbd>mouse</kbd> aim · <kbd>click</kbd>/<kbd>Space</kbd> attack · <kbd>Shift</kbd> dash · <kbd>E</kbd> special · <kbd>F</kbd> potion · <kbd>P</kbd> pause · <kbd>M</kbd> mute · <kbd>V</kbd> narrator · <kbd>N</kbd> music · gamepad: sticks move and aim, triggers fight · Co-op P2: <kbd>arrows</kbd>, <kbd>Enter</kbd> attack, <kbd>Right Shift</kbd> dash, <kbd>Right Ctrl</kbd> special, <kbd>Right Alt</kbd> potion</p>
 </div>
 <div id="stage">
   <canvas id="cv"></canvas>
