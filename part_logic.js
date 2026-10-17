@@ -219,7 +219,7 @@ function scheduleBeat(t, step, intensity, lowHp) {
 const META_KEY = 'hollowdeep-meta';
 const META = { best: 0, echoes: 0, perks: {}, runs: 0, deepest: 1, wins: 0, taught: {}, reduceMotion: false, voice: true, music: true };
 const TAUGHT = [
-  ['drain', 'Your health drains the whole way down. Food is the only thing that gives it back.'],
+  ['drain', 'Your health drains the whole way down \u2014 the shaded part of your bar is the next ten seconds of it. Food is the only thing that gives it back.'],
   ['crypt', 'A crypt. It keeps sending them up until you break it.'],
   ['door', 'The way down is locked. The key is somewhere on this floor.'],
 ];
@@ -549,6 +549,16 @@ function rollOmen(depth) {
   return OMENS[rint(0, OMENS.length - 1)];
 }
 const om = (k, dflt) => (G.omen && G.omen[k] !== undefined) ? G.omen[k] : dflt;
+/* The drain, in one place, because the health bar draws this number and the
+   floor takes it: two copies would be two answers.
+   drainPlain is what the depth alone asks. Everything past it -- the omen,
+   the pacts, a curse, the Barrow's slow blood, the mercy of having company
+   -- is the part worth showing a player, because it is the part they chose
+   or were dealt. */
+function drainPlain() { return .8 + Math.min(G.level, 8) * .2 + Math.max(0, G.level - 8) * .07; }
+function drainRate(P) { return drainPlain() * om('drain', 1) * (G.co ? .85 : 1) * ((P && P.drainMul) || 1); }
+/* how far the band on the bar looks ahead */
+const DRAIN_AHEAD = 10;
 
 /* ---------- fonts ----------
    A pact is the one bargain in the dungeon that costs you something. Every
@@ -1787,8 +1797,7 @@ function updatePlayer(P, I, dt) {
   P.chill = Math.max(0, P.chill - dt);
   if (I.bomb) useBomb(P);
   /* the dungeon itself is draining you; food is the only clock that matters */
-  const dl = (.8 + Math.min(G.level, 8) * .2 + Math.max(0, G.level - 8) * .07) * om('drain', 1);
-  P.hp -= dl * (G.co ? .85 : 1) * (P.drainMul || 1) * dt;
+  P.hp -= drainRate(P) * dt;
   /* only once it has actually cost something, and only when nothing is
      hitting you, so the lesson is unmistakably about the drain */
   if (P.hp < P.max * .92 && clock - (P.lastHit || 0) > 3.5) teach('drain');
@@ -3976,12 +3985,23 @@ function render() {
 }
 
 /* ---------- UI ---------- */
-const mkHud = s => ({ box: $('hp' + s), hp: $('hpFill' + s), txt: $('hpTxt' + s), dash: $('dashFill' + s), sp: $('spFill' + s), name: $('clsName' + s), xp: $('xpFill' + s), lv: $('lv' + s), gear: $('gear' + s) });
+const mkHud = s => ({ box: $('hp' + s), hp: $('hpFill' + s), txt: $('hpTxt' + s), dash: $('dashFill' + s), sp: $('spFill' + s), name: $('clsName' + s), xp: $('xpFill' + s), lv: $('lv' + s), gear: $('gear' + s), drain: $('drainFill' + s) });
 const hud1 = mkHud(''), hud2 = mkHud('2'), hud = { lvl: $('lvl'), gold: $('gold'), keys: $('keys'), combo: $('combo'), comboBox: $('comboBox'), bombs: $('bombs'), bombBox: $('bombBox'), omenBox: $('omenBox'), omenName: $('omenName') };
 const SLOT_GLYPH = { weapon: 'W', armour: 'A', trinket: 'T' };
 function setHp(h, P) {
   h.hp.style.width = (P.hp / P.max * 100) + '%'; h.txt.textContent = P.down ? 'DOWN' : Math.ceil(P.hp) + ' / ' + P.max;
   h.hp.style.background = P.hp / P.max < .34 ? '#ff2f28' : '';
+  /* the next ten seconds of drain, drawn to scale at the leading edge */
+  if (h.drain) {
+    const rate = drainRate(P), cost = Math.min(P.hp, rate * DRAIN_AHEAD);
+    const lo = Math.max(0, (P.hp - cost) / P.max), hi = Math.max(lo, P.hp / P.max);
+    h.drain.hidden = P.down || P.hp <= 0;
+    h.drain.style.left = (lo * 100) + '%';
+    h.drain.style.width = ((hi - lo) * 100) + '%';
+    /* amber when something you took made it worse than the depth alone */
+    h.drain.classList.toggle('worse', rate > drainPlain() * 1.02);
+    h.drain.title = 'The deep takes ' + rate.toFixed(1) + ' health a second here';
+  }
   h.xp.style.width = clamp(P.xp / xpNeed(P.plvl), 0, 1) * 100 + '%';
   h.lv.textContent = 'LV ' + P.plvl;
   for (const sp of h.gear.children) {

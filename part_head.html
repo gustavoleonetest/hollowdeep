@@ -43,7 +43,12 @@ body{
 .shsec{margin:4px 0 -4px; font:400 22px/1 var(--display); color:var(--dim); letter-spacing:.04em}
 .orow{display:flex; gap:12px; justify-content:space-between; align-items:baseline; padding:7px 12px; background:var(--stone); border:1px solid var(--line); font-size:13px; color:var(--dim); min-width:0}
 .orow b{color:var(--bone); font-weight:600; text-align:right; min-width:0}
-.track{height:8px; background:#0a0c11; border:1px solid var(--line)}
+.track{height:8px; background:#0a0c11; border:1px solid var(--line); position:relative}
+/* the share of the bar the deep is about to take: hatched, so it reads as
+   spoken for rather than as health you still have */
+.fill.drain{position:absolute; top:0; width:0; transition:none; pointer-events:none;
+  background:repeating-linear-gradient(135deg, rgba(8,10,14,.62) 0 2px, rgba(8,10,14,0) 2px 5px)}
+.fill.drain.worse{background:repeating-linear-gradient(135deg, rgba(120,62,10,.62) 0 2px, rgba(120,62,10,0) 2px 5px)}
 .fill{height:100%; width:100%; background:var(--blood); transition:width .12s}
 .fill.dash{background:var(--cyan); transition:none}
 .fill.sp{background:#6b6f7c; transition:none}
@@ -118,7 +123,7 @@ body{
     <div class="hpcol">
       <div class="panel hp" id="hp">
         <div class="nm"><span id="clsName">Bulwark</span><span class="lv" id="lv">LV 1</span><span class="tx" id="hpTxt">0 / 0</span></div>
-        <div class="track"><div class="fill" id="hpFill"></div></div>
+        <div class="track"><div class="fill" id="hpFill"></div><div class="fill drain" id="drainFill" hidden></div></div>
         <div class="track xpt" title="Experience"><div class="fill xp" id="xpFill"></div></div>
         <div class="track" title="Dash"><div class="fill dash" id="dashFill"></div></div>
         <div class="track" title="Special (E)"><div class="fill sp" id="spFill"></div></div>
@@ -126,7 +131,7 @@ body{
       </div>
       <div class="panel hp" id="hp2" hidden>
         <div class="nm"><span id="clsName2">Ember</span><span class="lv" id="lv2">LV 1</span><span class="tx" id="hpTxt2">0 / 0</span></div>
-        <div class="track"><div class="fill" id="hpFill2"></div></div>
+        <div class="track"><div class="fill" id="hpFill2"></div><div class="fill drain" id="drainFill2" hidden></div></div>
         <div class="track xpt" title="Experience"><div class="fill xp" id="xpFill2"></div></div>
         <div class="track" title="Dash"><div class="fill dash" id="dashFill2"></div></div>
         <div class="track" title="Special (Right Ctrl)"><div class="fill sp" id="spFill2"></div></div>

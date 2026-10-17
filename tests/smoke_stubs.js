@@ -29,7 +29,19 @@ function ctx2d() {
 function el(id) {
   const e = {
     id, style: { setProperty() {}, removeProperty() {} }, dataset: { m: '1' },
-    classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+    /* a real one: a no-op classList makes every test that asks about a
+       class pass whatever the code does, which is worse than no test */
+    classList: (() => {
+      const set = new Set();
+      return {
+        add: (...c) => c.forEach(x => set.add(x)),
+        remove: (...c) => c.forEach(x => set.delete(x)),
+        toggle: (c, on) => { const want = on === undefined ? !set.has(c) : !!on; if (want) set.add(c); else set.delete(c); return want; },
+        contains: c => set.has(c),
+        get length() { return set.size; },
+        toString: () => [...set].join(' '),
+      };
+    })(),
     children: [], innerHTML: '', textContent: '', value: '', title: '',
     hidden: false, disabled: false, type: '', className: '',
     clientWidth: 960, clientHeight: 600, width: 160, height: 160,
