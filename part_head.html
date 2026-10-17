@@ -1,0 +1,200 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Hollowdeep</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pirata+One&family=Spline+Sans+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: slim title bar above a full-bleed dungeon stage; menu, HUD and minimap float on the stage. */
+:root{
+  --ink:#0c0e13; --stone:#161a23; --stone2:#212737; --line:#2d3548;
+  --bone:#ebe4d2; --dim:#98a0b3; --torch:#f0a23c; --blood:#d9534f; --cyan:#8fd3ff;
+  --display:"Pirata One","Palatino Linotype",Georgia,serif;
+  --mono:"Spline Sans Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{
+  margin:0; box-sizing:border-box; overflow:hidden;
+  background:var(--ink); color:var(--bone); font:14px/1.45 var(--mono);
+  display:flex; flex-direction:column; gap:10px;
+  padding-block:10px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+.bar{display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:4px 16px; min-width:0}
+.bar h1{margin:0; font:400 30px/1 var(--display); letter-spacing:.04em; color:var(--torch); text-wrap:balance}
+.bar p{margin:0; color:var(--dim); font-size:12px; letter-spacing:.02em; min-width:0}
+.bar kbd{font:inherit; color:var(--bone)}
+#stage{position:relative; flex:1; min-height:0; border:1px solid var(--line); background:#05070a; overflow:hidden}
+#cv{display:block; width:100%; height:100%; touch-action:none; cursor:crosshair}
+.panel{background:rgba(12,14,19,.74); border:1px solid var(--line); padding:8px 10px}
+#hud{position:absolute; top:10px; left:10px; right:10px; display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-start; gap:8px 10px; pointer-events:none}
+#hud[hidden]{display:none}
+.hp{width:min(220px,46vw); display:grid; gap:6px}
+.hp .nm{display:flex; align-items:baseline; gap:8px; font-size:12px; letter-spacing:.06em; text-transform:uppercase}
+.hp .nm .tx{margin-left:auto}
+.hp .lv{color:var(--torch); font-size:10px; letter-spacing:.1em}
+.track.xpt{height:4px}
+.fill.xp{background:#c9a24a; transition:none}
+.gear{display:flex; gap:4px}
+.gear span{flex:none; width:19px; height:19px; display:grid; place-items:center; border:1px solid var(--line); border-radius:3px; color:#454c5e; font:600 10px var(--mono)}
+.itemstats{display:grid; gap:2px; font-size:12px; color:var(--dim)}
+.itemrar{font-size:10px; letter-spacing:.1em; text-transform:uppercase; opacity:.85}
+.shsec{margin:4px 0 -4px; font:400 22px/1 var(--display); color:var(--dim); letter-spacing:.04em}
+.orow{display:flex; gap:12px; justify-content:space-between; align-items:baseline; padding:7px 12px; background:var(--stone); border:1px solid var(--line); font-size:13px; color:var(--dim); min-width:0}
+.orow b{color:var(--bone); font-weight:600; text-align:right; min-width:0}
+.track{height:8px; background:#0a0c11; border:1px solid var(--line)}
+.fill{height:100%; width:100%; background:var(--blood); transition:width .12s}
+.fill.dash{background:var(--cyan); transition:none}
+.fill.sp{background:#6b6f7c; transition:none}
+#spBtn{display:none; position:absolute; right:84px; bottom:calc(min(156px,30vw)*.73 + 22px); width:64px; height:64px; border-radius:50%; border:1px solid var(--gold,#f0a23c); background:rgba(12,14,19,.7); color:var(--gold,#f0a23c); font:600 11px var(--mono); letter-spacing:.08em}
+@media (pointer:coarse){#spBtn{display:block}}
+#bombBtn{display:none; position:absolute; right:10px; bottom:calc(min(156px,30vw)*.73 + 94px); width:64px; height:64px; border-radius:50%; border:1px solid #b98cff; background:rgba(12,14,19,.7); color:#b98cff; font:600 11px var(--mono); letter-spacing:.08em}
+@media (pointer:coarse){#bombBtn{display:block}}
+.stats{display:flex; flex-wrap:wrap; gap:4px 14px; font-size:13px; font-variant-numeric:tabular-nums; min-width:0}
+@media (max-width:520px){.stats{gap:3px 10px; font-size:12px}.hp{width:min(200px,54vw)}}
+.stats b{font-weight:600; color:var(--torch)}
+#mini{position:absolute; right:10px; bottom:10px; width:min(156px,30vw); height:auto; background:rgba(12,14,19,.74); border:1px solid var(--line); image-rendering:pixelated; pointer-events:none}
+#dashBtn{display:none; position:absolute; right:10px; bottom:calc(min(156px,30vw)*.73 + 22px); width:64px; height:64px; border-radius:50%; border:1px solid var(--cyan); background:rgba(12,14,19,.7); color:var(--cyan); font:600 11px var(--mono); letter-spacing:.08em}
+@media (pointer:coarse){#dashBtn{display:block}}
+.overlay{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:16px; overflow:auto; background:rgba(6,8,12,.66)}
+.overlay[hidden],[hidden]{display:none!important}
+.sheet{width:100%; max-width:780px; margin:auto; display:grid; gap:14px}
+.sheet h2{margin:0; font:400 38px/1.05 var(--display); color:var(--bone); text-wrap:balance}
+.sheet .sub{margin:0; color:var(--dim); max-width:60ch}
+.cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px}
+.card{all:unset; box-sizing:border-box; cursor:pointer; display:grid; gap:8px; align-content:start; padding:12px; background:var(--stone); border:1px solid var(--line); min-width:0}
+.card:hover,.card:focus-visible{border-color:var(--c); background:var(--stone2); outline:none}
+.card:focus-visible{box-shadow:0 0 0 2px var(--c)}
+.card .gl{width:64px; height:64px; border-radius:10px; background:radial-gradient(circle at 50% 55%, #1f2638, #0c0e13); border:1px solid var(--c); box-shadow:0 0 16px -6px var(--c)}
+.card .nm{font:400 26px/1 var(--display); color:var(--c)}
+.card .bl{font-size:12px; color:var(--dim); min-height:3.8em}
+.meter{display:grid; grid-template-columns:54px 1fr; gap:6px; align-items:center; font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em}
+.meter i{display:block; height:5px; background:#0a0c11}
+.meter i::after{content:""; display:block; height:100%; width:var(--v); background:var(--c)}
+.row{display:flex; flex-wrap:wrap; gap:10px; align-items:center}
+.btn{all:unset; cursor:pointer; padding:9px 16px; border:1px solid var(--torch); color:var(--torch); font:600 13px var(--mono); letter-spacing:.06em; text-transform:uppercase}
+.btn:hover,.btn:focus-visible{background:var(--torch); color:var(--ink)}
+.btn.alt{border-color:var(--line); color:var(--dim)}
+.btn.alt:hover,.btn.alt:focus-visible{background:var(--stone2); color:var(--bone)}
+.btn.on{background:var(--torch); color:var(--ink)}
+.hpcol{display:grid; gap:8px}
+.rare{color:var(--torch); font-size:11px; letter-spacing:.08em; text-transform:uppercase}
+.big{font-variant-numeric:tabular-nums; color:var(--torch)}
+.shophead{display:flex; gap:14px; align-items:center}
+#vendor{flex:none; width:72px; height:72px; border-radius:10px; border:1px solid var(--line); background:radial-gradient(circle at 50% 55%,#1f2638,#0c0e13)}
+.goldline{display:flex; flex-wrap:wrap; gap:6px 18px; align-items:baseline}
+.goldline .gl2{font:400 28px/1 var(--display); color:var(--torch)}
+.heroline{font-size:12px; color:var(--dim)}
+.srows{display:grid; gap:8px}
+.srow{display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:center; padding:10px 12px; background:var(--stone); border:1px solid var(--line); border-left:3px solid var(--c)}
+.srow .nm{display:block; font:400 22px/1.05 var(--display); color:var(--c)}
+.srow .bl{display:block; font-size:12px; color:var(--dim)}
+.sbuy{display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end}
+.btn.buy{padding:6px 10px; font-size:12px}
+.btn[disabled]{opacity:.38; cursor:not-allowed; background:none; color:var(--torch)}
+.btn[disabled]:hover{background:none; color:var(--torch)}
+@media (max-width:520px){.srow{grid-template-columns:1fr}.sbuy{justify-content:flex-start}}
+@media (max-width:520px){.bar h1{font-size:26px}.sheet h2{font-size:30px}}
+</style>
+<div class="bar">
+  <h1>Hollowdeep</h1>
+  <p><kbd>WASD</kbd> move · <kbd>mouse</kbd> aim · <kbd>click</kbd>/<kbd>Space</kbd> attack · <kbd>Shift</kbd> dash · <kbd>E</kbd> special · <kbd>F</kbd> potion · <kbd>P</kbd> pause · <kbd>M</kbd> mute · <kbd>V</kbd> narrator · <kbd>N</kbd> music · gamepad: sticks move and aim, triggers fight · Co-op P2: <kbd>arrows</kbd>, <kbd>Enter</kbd> attack, <kbd>Right Shift</kbd> dash, <kbd>Right Ctrl</kbd> special, <kbd>Right Alt</kbd> potion</p>
+</div>
+<div id="stage">
+  <canvas id="cv"></canvas>
+  <div id="hud" hidden>
+    <div class="hpcol">
+      <div class="panel hp" id="hp">
+        <div class="nm"><span id="clsName">Bulwark</span><span class="lv" id="lv">LV 1</span><span class="tx" id="hpTxt">0 / 0</span></div>
+        <div class="track"><div class="fill" id="hpFill"></div></div>
+        <div class="track xpt" title="Experience"><div class="fill xp" id="xpFill"></div></div>
+        <div class="track" title="Dash"><div class="fill dash" id="dashFill"></div></div>
+        <div class="track" title="Special (E)"><div class="fill sp" id="spFill"></div></div>
+        <div class="gear" id="gear"><span data-s="weapon">W</span><span data-s="armour">A</span><span data-s="trinket">T</span></div>
+      </div>
+      <div class="panel hp" id="hp2" hidden>
+        <div class="nm"><span id="clsName2">Ember</span><span class="lv" id="lv2">LV 1</span><span class="tx" id="hpTxt2">0 / 0</span></div>
+        <div class="track"><div class="fill" id="hpFill2"></div></div>
+        <div class="track xpt" title="Experience"><div class="fill xp" id="xpFill2"></div></div>
+        <div class="track" title="Dash"><div class="fill dash" id="dashFill2"></div></div>
+        <div class="track" title="Special (Right Ctrl)"><div class="fill sp" id="spFill2"></div></div>
+        <div class="gear" id="gear2"><span data-s="weapon">W</span><span data-s="armour">A</span><span data-s="trinket">T</span></div>
+      </div>
+    </div>
+    <div class="panel stats">
+      <span>Depth <b id="lvl">1</b></span>
+      <span>Gold <b id="gold">0</b></span>
+      <span>Keys <b id="keys">0</b></span>
+      <span id="bombBox">Potions <b id="bombs">0</b></span>
+      <span id="comboBox" hidden>Chain <b id="combo">0</b></span>
+      <span id="omenBox" hidden><b id="omenName"></b></span>
+    </div>
+  </div>
+  <canvas id="mini" width="156" height="114"></canvas>
+  <button id="dashBtn" type="button">DASH</button>
+  <button id="spBtn" type="button">SPECIAL</button>
+  <button id="bombBtn" type="button">POTION</button>
+  <div class="overlay" id="menu">
+    <div class="sheet">
+      <h2>Pick a delver and go down.</h2>
+      <p class="sub">Smash the crypts, take the key, unlock the door, find the stairs. <b>Your health drains the whole way down</b>, so food is the only clock that matters. Monsters drop rolled gear — weapons, armour and trinkets with their own affixes — and kills earn levels. Keep a potion for when the floor turns against you. <b>The Hollow Heart waits at depth 21</b> — put it down and the deep is yours. Best run: <span class="big" id="best">0</span><span id="menuWins"></span></p>
+      <div class="row" id="modes">
+        <button class="btn on" type="button" data-m="1">One delver</button>
+        <button class="btn alt" type="button" data-m="2">Two delvers, one keyboard</button>
+        <button class="btn alt" id="barrowBtn" type="button">The Barrow · <span id="echoes">0</span></button>
+      </div>
+      <div class="row" id="opts">
+        <button class="btn alt" id="optMotion" type="button">Reduce motion: off</button>
+        <button class="btn alt" id="optVoice" type="button">Narrator: on</button>
+        <button class="btn alt" id="optMusic" type="button">Music: on</button>
+      </div>
+      <p class="sub" id="pickHint" aria-live="polite"></p>
+      <p class="sub" style="font-size:12px;opacity:.7">Art: Kenney and Quaternius (CC0).</p>
+      <div class="cards" id="cards"></div>
+    </div>
+  </div>
+  <div class="overlay" id="over" hidden>
+    <div class="sheet">
+      <h2 id="oTitle">Swallowed by the deep.</h2>
+      <p class="sub" id="oLine"></p>
+      <div class="srows" id="oStats"></div>
+      <p class="sub"><span id="oEchLbl">Echoes earned</span> <b class="big" id="oEch">+0</b> · you now hold <b class="big" id="oEchTot">0</b></p>
+      <div class="row">
+        <button class="btn" id="deeper" type="button" hidden>Go deeper</button>
+        <button class="btn" id="again" type="button">Descend again</button>
+        <button class="btn alt" id="oBarrow" type="button">The Barrow</button>
+        <button class="btn alt" id="change" type="button">Change delver</button>
+      </div>
+    </div>
+  </div>
+  <div class="overlay" id="shop" hidden>
+    <div class="sheet">
+      <div class="shophead"><canvas id="vendor" width="96" height="96"></canvas><div><h2>The Wayfarer's Stall</h2><p class="sub" id="shopSub"></p></div></div>
+      <div class="goldline"><span>Gold <b class="gl2" id="shopGold">0</b></span><div id="shopHeroes"></div></div>
+      <h3 class="shsec">Wares</h3>
+      <div class="srows" id="shopWares"></div>
+      <h3 class="shsec">Blessings</h3>
+      <div class="srows" id="shopRows"></div>
+      <div class="row"><button class="btn" id="descend" type="button">Descend</button></div>
+    </div>
+  </div>
+  <div class="overlay" id="barrow" hidden>
+    <div class="sheet">
+      <h2>The Barrow</h2>
+      <p class="sub" id="barrowSub"></p>
+      <div class="srows" id="barrowRows"></div>
+      <div class="row"><button class="btn" id="barrowBack" type="button">Back</button></div>
+    </div>
+  </div>
+  <div class="overlay" id="loot" hidden>
+    <div class="sheet">
+      <h2 id="lootT">Chest opened</h2>
+      <p class="sub" id="lootS"></p>
+      <div class="cards" id="lootCards"></div>
+      <p class="sub" id="lootHint">Click a card or press 1, 2 or 3.</p>
+    </div>
+  </div>
+</div>
+<script>
+/* Generated: sprite atlases rendered from Kenney CC0 3D models (Mini Dungeon, Graveyard Kit, Mini Characters). */
