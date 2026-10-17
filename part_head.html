@@ -111,6 +111,21 @@ body{
 .btn[disabled]:hover{background:none; color:var(--torch)}
 @media (max-width:520px){.srow{grid-template-columns:1fr}.sbuy{justify-content:flex-start}}
 @media (max-width:520px){.bar h1{font-size:26px}.sheet h2{font-size:30px}}
+.phoneonly{display:none}
+/* On a narrow screen the delvers come up to meet you: title, the run you
+   left, how many of you there are, then the cards. The blurb keeps every
+   word it had and waits below, where it is still there for anyone who
+   wants it. Nothing changes on a wider screen. */
+@media (max-width:520px){
+  #menu .sheet h2{order:1}
+  #menu .sheet #resumeRow{order:2}
+  #menu .sheet #modes{order:3}
+  #menu .sheet #miniHint{order:4; display:block}
+  #menu .sheet #pickHint{order:5}
+  #menu .sheet #cards{order:6}
+  #menu .sheet #opts{order:7}
+  #menu .sheet .sub{order:8}
+}
 </style>
 <div class="bar">
   <h1>Hollowdeep</h1>
@@ -169,6 +184,7 @@ body{
         <button class="btn alt" id="optVoice" type="button">Narrator: on</button>
         <button class="btn alt" id="optMusic" type="button">Music: on</button>
       </div>
+      <p class="sub phoneonly" id="miniHint">Smash the crypts, take the key, find the stairs. <b>Your health drains the whole way down.</b></p>
       <p class="sub" id="pickHint" aria-live="polite"></p>
       <p class="sub" style="font-size:12px;opacity:.7">Art: Kenney and Quaternius (CC0).</p>
       <div class="cards" id="cards"></div>
