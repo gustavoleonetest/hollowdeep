@@ -1814,6 +1814,47 @@ ok('not to the first', G.players[0].dmgMul === first0);
     loadMeta(); }
 }
 
+/* ---------------- looking away does not cost the run ---------------- */
+{
+  const hide = (on) => { try { Object.defineProperty(document, 'hidden', { value: on, configurable: true }); } catch (e) { document.hidden = on; } };
+  const wasHidden = !!document.hidden;
+
+  startGame(['bulwark']); G.level = 3; genLevel();
+  let gg = 0; while (G.offer && gg++ < 20) applyUpgrade(0); G.offerQ.length = 0; G.state = 'play'; G.paused = false;
+  bareFloor();
+
+  hide(true); pauseForHidden();
+  ok('a run holds when the page goes out of sight', G.paused === true);
+
+  /* and the clock must genuinely stop, not merely look stopped */
+  { const P = G.players[0], h0 = P.hp;
+    for (let i = 0; i < 300; i++) { if (G.state === 'play' && !G.paused) update(1 / 60); }
+    ok('and nothing drains while it is held', P.hp === h0, h0.toFixed(1) + ' -> ' + P.hp.toFixed(1)); }
+
+  /* coming back must not drop you straight into whatever you walked away from */
+  hide(false); pauseForHidden();
+  ok('coming back does not resume on its own', G.paused === true);
+
+  /* P is no use on a phone, so a tap has to work: resumeFromPause is what
+     both the click and the touch handler call */
+  ok('and a tap or click carries on', resumeFromPause() === true && G.paused === false);
+  ok('but does nothing when there is nothing to resume', resumeFromPause() === false);
+
+  /* a key held down as you tab away must not still be held when you return */
+  { G.paused = false; keys.KeyD = true; mouse.down = true;
+    hide(true); pauseForHidden();
+    ok('a held key is let go when the run is put down', !keys.KeyD && !mouse.down);
+    hide(false); G.paused = false; }
+
+  /* the menu, the stall and the death screen are not runs */
+  for (const st of ['menu', 'shop', 'dead', 'won']) {
+    G.state = st; G.paused = false;
+    hide(true); pauseForHidden();
+    ok('nothing to hold while in ' + st, G.paused === false);
+  }
+  hide(wasHidden); G.state = 'play'; G.paused = false;
+}
+
 const fails = results.filter(r => r[0] === 'FAIL');
 for (const [st, n, x] of results) console.log(st + '  ' + n + (x ? '  [' + x + ']' : ''));
 console.log('\n' + (results.length - fails.length) + '/' + results.length + ' checks passed');

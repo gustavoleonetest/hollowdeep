@@ -3566,11 +3566,34 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouse.down = false; });
+/* hold the run while the page is out of sight, and leave it held: dropping
+   someone straight back into a fight they walked away from is worse */
+function pauseForHidden() {
+  if (typeof document === 'undefined') return;
+  if (document.hidden && G.state === 'play' && !G.paused) {
+    G.paused = true;
+    for (const k in keys) keys[k] = false;
+    mouse.down = false; spTouch = dashTouch = bombTouch = false;
+    touch.move = null; touch.aim = null;
+  }
+}
+if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('visibilitychange', pauseForHidden);
+addEventListener('visibilitychange', pauseForHidden);
+addEventListener('pagehide', pauseForHidden);
+addEventListener('blur', pauseForHidden);
+/* P is no use on a phone, so anything that counts as "I am back" resumes */
+function resumeFromPause() {
+  if (G.state !== 'play' || !G.paused) return false;
+  G.paused = false;
+  return true;
+}
 cv.addEventListener('mousemove', e => { const r = cv.getBoundingClientRect(); mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top; mouse.last = performance.now(); });
-cv.addEventListener('mousedown', () => { mouse.down = true; mouse.last = performance.now(); initAudio(); });
+cv.addEventListener('mousedown', () => { if (resumeFromPause()) return; mouse.down = true; mouse.last = performance.now(); initAudio(); });
 addEventListener('mouseup', () => { mouse.down = false; });
 cv.addEventListener('pointerdown', e => {
-  if (e.pointerType === 'mouse') return; initAudio();
+  if (e.pointerType === 'mouse') return;
+  if (resumeFromPause()) return;
+  initAudio();
   try { cv.setPointerCapture(e.pointerId); } catch (x) {}
   const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, s = { id: e.pointerId, ox: x, oy: y, x, y };
   if (x < W / 2) touch.move = s; else touch.aim = s;
@@ -3835,7 +3858,14 @@ function drawScreenFx() {
     ctx.fillStyle = v.col; ctx.fillText(v.txt, W / 2, vy);
     ctx.globalAlpha = 1;
   }
-  if (G.paused) { ctx.fillStyle = 'rgba(6,8,12,.6)'; ctx.fillRect(0, 0, W, H); ctx.fillStyle = C.bone; ctx.font = '400 54px "Pirata One",Georgia,serif'; ctx.textAlign = 'center'; ctx.fillText('Paused', W / 2, H / 2); }
+  if (G.paused) {
+    ctx.fillStyle = 'rgba(6,8,12,.6)'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = C.bone; ctx.font = '400 54px "Pirata One",Georgia,serif'; ctx.textAlign = 'center';
+    ctx.fillText('Paused', W / 2, H / 2 - 14);
+    ctx.fillStyle = '#98a0b3'; ctx.font = '400 15px "Spline Sans Mono",monospace';
+    ctx.fillText(btnsOn ? 'Tap to carry on' : 'Press P, or click, to carry on', W / 2, H / 2 + 26);
+    ctx.textAlign = 'left';
+  }
   for (const k of ['move', 'aim']) { const s = touch[k]; if (!s) continue; ctx.strokeStyle = 'rgba(235,228,210,.35)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(s.ox, s.oy, 50, 0, TAU); ctx.stroke(); ctx.fillStyle = 'rgba(235,228,210,.35)'; ctx.beginPath(); ctx.arc(s.ox + clamp(s.x - s.ox, -50, 50), s.oy + clamp(s.y - s.oy, -50, 50), 18, 0, TAU); ctx.fill(); }
 }
 function render() {
