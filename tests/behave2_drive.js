@@ -1744,6 +1744,76 @@ ok('not to the first', G.players[0].dmgMul === first0);
     voiceOn = was; }
 }
 
+/* ---------------- it explains itself, once ---------------- */
+{
+  const forget = () => { META.taught = {}; G.vlast = {}; G.voice = null; };
+  const said = () => (G.voice && G.voice.txt) || '';
+
+  ok('there is a lesson for each thing a new delver must work out',
+     TAUGHT.length >= 3 && TAUGHT.every(t => t[0] && t[1] && t[1].length > 20), TAUGHT.map(t => t[0]).join(','));
+
+  /* the drain: only once it has cost you, and only with nothing hitting you */
+  { forget(); bareFloor();
+    startGame(['bulwark']); G.level = 2; genLevel(); G.state = 'play';
+    bareFloor();
+    const P = G.players[0];
+    ok('nothing is said while you are still whole', !META.taught.drain);
+    P.hp = P.max; P.inv = 1e9; P.lastHit = -999;
+    for (let i = 0; i < 60 * 25 && !META.taught.drain; i++) update(1 / 60);
+    ok('the drain explains itself once it bites', !!META.taught.drain, said().slice(0, 40)); }
+
+  /* and never again, on any later run */
+  { const before = said();
+    G.vlast = {}; G.voice = null;
+    const P = G.players[0]; P.hp = P.max * .5;
+    for (let i = 0; i < 120; i++) update(1 / 60);
+    ok('and does not repeat itself afterwards', said() !== before || said() === '', said().slice(0, 30) || 'silent'); }
+
+  /* being hit is not the drain, and must not be explained as it */
+  { forget();
+    startGame(['bulwark']); G.level = 2; genLevel(); G.state = 'play';
+    bareFloor();
+    const P = G.players[0]; P.hp = P.max * .5; P.inv = 0; P.lastHit = clock;
+    for (let i = 0; i < 90; i++) { P.lastHit = clock; update(1 / 60); }
+    ok('taking hits is not explained as the drain', !META.taught.drain); }
+
+  /* a crypt, when one is actually in front of you */
+  { forget();
+    startGame(['sable']); G.level = 3; genLevel(); G.state = 'play';
+    G.nests.length = 0; fogA.fill(1);
+    const P = G.players[0];
+    updateNests(1 / 60);
+    ok('a crypt you cannot see teaches nothing', !META.taught.crypt);
+    G.nests.push({ x: P.x + 60, y: P.y, r: 15, hp: 100, max: 100, t: 9, flash: 0 });
+    fogA.fill(0);
+    updateNests(1 / 60);
+    ok('one you can see does', !!META.taught.crypt, said().slice(0, 40)); }
+
+  /* the locked door, when you reach it with nothing to open it */
+  { forget();
+    startGame(['thistle']); G.level = 3; genLevel(); G.state = 'play';
+    bareFloor();
+    const P = G.players[0], d = G.door;
+    G.keys = 0; P.lockMsg = 0;
+    P.x = d.x * T + T / 2; P.y = d.y * T + T / 2 + 20;
+    for (let i = 0; i < 90 && !META.taught.door; i++) { P.x = d.x * T + T / 2; P.y = d.y * T + T / 2 + 20; update(1 / 60); }
+    ok('the locked door says what it wants', !!META.taught.door, said().slice(0, 40)); }
+
+  /* a delver who has been told keeps it between runs */
+  { META.taught = { drain: 1, crypt: 1, door: 1 };
+    saveMeta(); loadMeta();
+    ok('what you have been told is remembered across runs',
+       META.taught.drain === 1 && META.taught.crypt === 1 && META.taught.door === 1, JSON.stringify(META.taught)); }
+
+  /* and a torn save cannot invent lessons that do not exist */
+  { const keep = localStorage.getItem(META_KEY);
+    localStorage.setItem(META_KEY, JSON.stringify({ taught: { drain: 1, nonsense: 1, door: 'yes' } }));
+    loadMeta();
+    ok('an unknown lesson is dropped on the way in', META.taught.nonsense === undefined, JSON.stringify(META.taught));
+    if (keep === null) localStorage.removeItem(META_KEY); else localStorage.setItem(META_KEY, keep);
+    loadMeta(); }
+}
+
 const fails = results.filter(r => r[0] === 'FAIL');
 for (const [st, n, x] of results) console.log(st + '  ' + n + (x ? '  [' + x + ']' : ''));
 console.log('\n' + (results.length - fails.length) + '/' + results.length + ' checks passed');

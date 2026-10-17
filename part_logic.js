@@ -217,7 +217,18 @@ function scheduleBeat(t, step, intensity, lowHp) {
    A run always ends. Echoes are what is left of it, and they buy the small
    advantages that make the next descent reach further. */
 const META_KEY = 'hollowdeep-meta';
-const META = { best: 0, echoes: 0, perks: {}, runs: 0, deepest: 1, wins: 0, reduceMotion: false, voice: true, music: true };
+const META = { best: 0, echoes: 0, perks: {}, runs: 0, deepest: 1, wins: 0, taught: {}, reduceMotion: false, voice: true, music: true };
+const TAUGHT = [
+  ['drain', 'Your health drains the whole way down. Food is the only thing that gives it back.'],
+  ['crypt', 'A crypt. It keeps sending them up until you break it.'],
+  ['door', 'The way down is locked. The key is somewhere on this floor.'],
+];
+function teach(id) {
+  if (!META.taught || META.taught[id]) return;
+  const row = TAUGHT.find(t => t[0] === id); if (!row) return;
+  META.taught[id] = 1; saveMeta();
+  announce(row[1], '#8fd3ff');
+}
 /* a whole number at least `lo`, or the fallback if it is anything else */
 function metaNum(v, dflt, lo) {
   const n = typeof v === 'number' ? v : parseFloat(v);
@@ -236,6 +247,10 @@ function loadMeta() {
          null still means "has not been chosen yet" for reduced motion */
       for (const k of ['voice', 'music']) if (typeof raw[k] === 'boolean') META[k] = raw[k];
       if (typeof raw.reduceMotion === 'boolean' || raw.reduceMotion === null) META.reduceMotion = raw.reduceMotion;
+      META.taught = {};
+      if (raw.taught && typeof raw.taught === 'object') {
+        for (const t of TAUGHT) if (raw.taught[t[0]]) META.taught[t[0]] = 1;
+      }
       META.perks = {};
       if (raw.perks && typeof raw.perks === 'object') {
         for (const p of PERKS) {
@@ -1263,7 +1278,7 @@ function downPlayer(P) {
 function hurtPlayer(P, dmg, ang, src) {
   if (P.down || P.inv > 0 || G.state !== 'play') return;
   const d = Math.max(1, Math.round(dmg * P.cls.armor * P.armMul * (P.shield > 0 ? .3 : 1)));
-  P.hp -= d; P.inv = .55; P.hurt = .25; G.shake = Math.max(G.shake, .3);
+  P.hp -= d; P.inv = .55; P.hurt = .25; P.lastHit = clock; G.shake = Math.max(G.shake, .3);
   if (bn(P, 'riposte')) { P.cd = 0; P.nextCrit = true; burst(P.x, P.y, '#fff1b8', 10, 150, .8, 'spark'); }
   if (G.combo > 0) { G.combo = Math.floor(G.combo * .5); if (G.combo <= 0) G.comboT = 0; }
   moveEnt(P, Math.cos(ang) * -6, Math.sin(ang) * -6);
@@ -1694,6 +1709,9 @@ function updatePlayer(P, I, dt) {
   /* the dungeon itself is draining you; food is the only clock that matters */
   const dl = (.8 + Math.min(G.level, 8) * .2 + Math.max(0, G.level - 8) * .07) * om('drain', 1);
   P.hp -= dl * (G.co ? .85 : 1) * (P.drainMul || 1) * dt;
+  /* only once it has actually cost something, and only when nothing is
+     hitting you, so the lesson is unmistakably about the drain */
+  if (P.hp < P.max * .92 && clock - (P.lastHit || 0) > 3.5) teach('drain');
   const frac = P.hp / P.max;
   if (frac < .12) announceOnce('dying' + P.idx, 9, P.cls.name + ' is about to die!', '#d9534f');
   else if (frac < .34) announceOnce('food' + P.idx, 11, P.cls.name + ' needs food, badly!', '#ffd24a');
@@ -1715,7 +1733,7 @@ function updatePlayer(P, I, dt) {
       const tx = Math.floor((P.x + ox * (P.r + 3)) / T), ty = Math.floor((P.y + oy * (P.r + 3)) / T);
       if (tx >= 0 && ty >= 0 && tx < MW && ty < MH && G.map[ty * MW + tx] === 2) {
         if (G.keys > 0) { G.keys--; G.map[ty * MW + tx] = 0; G.mapVer++; sfx('door'); G.shake = .15; burst((tx + .5) * T, (ty + .5) * T, '#a8743d', 16, 100); text(P.x, P.y - 18, 'Unlocked', '#f0a23c'); }
-        else if (!P.lockMsg || P.lockMsg < performance.now() - 1500) { P.lockMsg = performance.now(); text(P.x, P.y - 18, 'Locked. Find a key.', '#98a0b3'); }
+        else if (!P.lockMsg || P.lockMsg < performance.now() - 1500) { P.lockMsg = performance.now(); teach('door'); text(P.x, P.y - 18, 'Locked. Find a key.', '#98a0b3'); }
       }
     }
   }
@@ -2054,6 +2072,10 @@ function updateEnemies(dt) {
 }
 function updateNests(dt) {
   const alive = G.players.filter(p => !p.down);
+  if (alive.length) for (const n of G.nests) {
+    if (n.hp > 0 && fogAt(n.x, n.y) < .4 &&
+        alive.some(p => Math.hypot(p.x - n.x, p.y - n.y) < 260)) { teach('crypt'); break; }
+  }
   for (const n of G.nests) {
     n.flash = Math.max(0, n.flash - dt); if (n.hp <= 0) continue; n.t -= dt;
     const d = alive.reduce((m, p) => Math.min(m, Math.hypot(p.x - n.x, p.y - n.y)), 1e9);
