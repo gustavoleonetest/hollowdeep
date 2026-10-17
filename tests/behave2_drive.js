@@ -1863,8 +1863,13 @@ ok('not to the first', G.players[0].dmgMul === first0);
      fighting, with room left over: particles peaked at 322 against their cap
      of 1400, foes at 45, crypts at 47, props at 63, and nothing else got
      past single figures. A list that sails past these is growing, not busy. */
+  /* The foe ceiling is the arena's own arithmetic, not a measured peak: it
+     spawns while fewer than 44 are alive, in a batch of round(4 + depth*.45
+     + wave*2), which is about 19 at the deepest. So 43 + 19 = 62 is what
+     the code permits, and a measured max of 45 simply never hit an arena at
+     depth. Anything past 90 is growth, not a busy arena. */
   const CEILING = {
-    parts: 1400, enemies: 60, nests: 90, props: 160, torches: 60, hazards: 40,
+    parts: 1400, enemies: 90, nests: 90, props: 160, torches: 60, hazards: 40,
     texts: 200, fxs: 200, decals: 120, dying: 60, shots: 300, eshots: 400,
     zones: 300, timers: 200,
   };
@@ -1903,6 +1908,76 @@ ok('not to the first', G.players[0].dmgMul === first0);
   frame(performance.now());
   ok('and when the run is not running', btnsOn === shown(), btnsOn + ' vs ' + shown());
   $('hud').hidden = false;
+}
+
+/* ---------------- nothing hits you out of the dark ---------------- */
+{
+  /* Fog stops a foe being drawn past about eight tiles, while a foe notices
+     you from thirteen. That is fine for an archer, whose arrow is the
+     warning, but nothing should be able to reach out and touch you while
+     invisible. Measured over fifteen hundred frames on each of eight
+     depths, about one hit in ten came from a foe in fog, and every one was
+     an archer at roughly 265 units. */
+  const bad = [];
+  /* updateFog eases towards its target using real elapsed time, so in a tight
+     loop it barely moves and every foe looks fogged. Advance the clock like a
+     browser would, or this measures the harness instead of the game. */
+  const realNow = performance.now;
+  let fakeT = realNow.call(performance);
+  performance.now = () => (fakeT += 16.7);
+  const realHurt = hurtPlayer;
+  hurtPlayer = function (P, dmg, ang, src) {
+    const before = P.hp;
+    const r = realHurt.apply(this, arguments);
+    if (P.hp < before && src && src.x !== undefined) {
+      const d = Math.hypot(src.x - P.x, src.y - P.y);
+      if (fogAt(src.x, src.y) >= .4 && d < 120) bad.push((src.type || 'foe') + ' at ' + Math.round(d));
+    }
+    return r;
+  };
+  try {
+    for (const depth of [4, 9, 14]) {
+      startGame(['thistle']); G.level = depth; genLevel();
+      let gg = 0; while (G.offer && gg++ < 30) applyUpgrade(0);
+      G.offerQ.length = 0; G.state = 'play';
+      const P = G.players[0];
+      for (let i = 0; i < 700; i++) {
+        P.hp = P.max;
+        INS[0].mx = Math.cos(i / 40); INS[0].my = Math.sin(i / 37); INS[0].fire = true;
+        readInput(); update(1 / 60); updateFog();
+        if (G.state !== 'play') G.state = 'play';
+      }
+    }
+  } finally { hurtPlayer = realHurt; performance.now = realNow; INS[0].fire = false; INS[0].mx = 0; INS[0].my = 0; }
+  ok('nothing invisible reaches out and touches you', bad.length === 0, bad.slice(0, 3).join(', ') || 'none in 2100 frames');
+
+  /* and the arrow that is your only warning carries its own light. The
+     player's shots always punched a hole in the dark; the foes' did not,
+     so the one thing you needed to see was the dimmest thing on screen. */
+  { startGame(['sable']); G.level = 5; genLevel(); G.state = 'play';
+    G.eshots.length = 0; G.shots.length = 0;
+    const P = G.players[0];
+    /* hole() skips anything off screen, and the stubbed canvas has no size,
+       so give it one and put the camera on the player or everything culls */
+    const keepW = lightCv.width, keepH = lightCv.height;
+    lightCv.width = 800; lightCv.height = 600;
+    cam.x = P.x - 400 / (DPR * Z); cam.y = P.y - 300 / (DPR * Z);
+    let gradients = 0;
+    const realGrad = lctx.createRadialGradient;
+    lctx.createRadialGradient = function (...a) { gradients++; return realGrad.apply(lctx, a); };
+    try {
+      gradients = 0; drawLighting();
+      const without = gradients;
+      for (let i = 0; i < 6; i++) G.eshots.push({ x: P.x + 20 + i * 14, y: P.y, vx: 0, vy: 0, life: 9, r: 6, dmg: 1, own: null });
+      gradients = 0; drawLighting();
+      const withShots = gradients;
+      ok('an incoming shot lights its own way', withShots >= without + 6,
+         without + ' lights -> ' + withShots + ' with six arrows in the air');
+    } finally {
+      lctx.createRadialGradient = realGrad;
+      lightCv.width = keepW; lightCv.height = keepH;
+      G.eshots.length = 0;
+    } }
 }
 
 const fails = results.filter(r => r[0] === 'FAIL');

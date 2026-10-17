@@ -3697,6 +3697,7 @@ function drawLighting() {
   const fz = (x, y) => fogAt(x, y) > .85;
   for (const t of G.torches) if (!fz(t.x, t.y)) hole(t.x, t.y + 14, 170 + Math.sin(clock * 8 + t.ph) * 6 + Math.sin(clock * 19 + t.ph * 3) * 3 + Math.sin(clock * 33 + t.ph) * 1.5, .9);
   for (const s of G.shots) hole(s.x, s.y, s.kind === 'fire' ? 130 : 70, .8);
+  for (const s of G.eshots) hole(s.x, s.y, 56, .6);
   for (const n of G.nests) if (!fz(n.x, n.y)) hole(n.x, n.y, 80, .6);
   for (const pr of G.props) if (pr.lit && !fz(pr.x, pr.y)) hole(pr.x, pr.y, pr.lit, .7);
   for (const hz of G.hazards) if ((hz.warn || hz.up > .1) && !fz(hz.x, hz.y)) hole(hz.x, hz.y, 60, .45);
@@ -3714,7 +3715,7 @@ function drawLighting() {
   for (const t of G.torches) if (!fz(t.x, t.y)) tint(t.x, t.y + 8, 140 + Math.sin(clock * 11 + t.ph) * 8, zn.amb, .17);
   for (const P of G.players) if (!P.down) tint(P.x, P.y, 110, P.cls.col, .09);
   for (const s of G.shots) { const ec = s.own && s.own.g && s.own.g.elem ? ELEM_COL[s.own.g.elem] : s.col; tint(s.x, s.y, s.kind === 'fire' ? 120 : 74, ec, .34); }
-  for (const s of G.eshots) tint(s.x, s.y, 42, '#ebe4d2', .2);
+  for (const s of G.eshots) tint(s.x, s.y, 48, '#ffd9a8', .3);
   for (const b of G.bolts) { const a = Math.max(0, 1 - b.t / .22); if (a > 0) { tint(b.x1, b.y1, 96, '#c9b6ff', .5 * a); tint(b.x2, b.y2, 80, '#c9b6ff', .4 * a); } }
   for (const e of G.enemies) {
     if (fz(e.x, e.y)) continue;
