@@ -64,12 +64,33 @@ def build():
     return pub
 
 
+def atlas_frames():
+    """The real frame names, read from the sprite data.
+
+    The stub used to carry a hand-typed copy of these and had drifted 24 frames
+    behind, so anything newly drawn rendered nothing under test while passing.
+    """
+    import json
+    import re
+    d = read('part_data.txt')
+    out = {}
+    for var, atlas in (('SPR_META', 'props'), ('SPR_META2', 'props2')):
+        m = re.search(var + r'\s*=\s*(\{.*?\});', d, re.S)
+        out[atlas] = sorted(json.loads(m.group(1))[atlas]['frames'].keys())
+    return out
+
+
 def bundle():
     """Stub out the DOM, append the game, then a driver: one file node can run."""
+    import json
     logic = read('part_logic.js')
     game = logic[:logic.rindex('</script>')]
     write_build('check.js', game)
     stubs = read(os.path.join('tests', 'smoke_stubs.js'))
+    fr = atlas_frames()
+    stubs = stubs.replace('__PROP_NAMES__', json.dumps(fr['props']))
+    stubs = stubs.replace('__PROP2_NAMES__', json.dumps(fr['props2']))
+    assert '__PROP' not in stubs, 'a frame-list placeholder was left unfilled'
     for name, driver in DRIVERS:
         write_build(name + '.js', stubs + chr(10) + game + chr(10) + read(os.path.join('tests', driver)))
 

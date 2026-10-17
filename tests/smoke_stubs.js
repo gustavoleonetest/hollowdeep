@@ -66,14 +66,11 @@ if (!globalThis.performance) globalThis.performance = { now: () => Date.now() };
 /* sprite metadata: same keys as the real atlases, no image data */
 const charAnim = { sz: 160, ax: 80, ay: 110, walk: 0, atk: 8, die: 16, idle: 17, roll: 25, hit: 33, pick: 41 };
 const foeAnim = { sz: 160, ax: 80, ay: 110, walk: 0, atk: 8, die: 16, dieAy: 100 };
-const propNames = ['altar', 'banner', 'barrel', 'brazier', 'candles', 'chest', 'chest_open', 'coffin', 'column', 'cross',
-  'crypt', 'crypt_b', 'gate', 'grave_bevel', 'grave_broken', 'grave_cross', 'grave_round', 'key', 'lantern', 'pillar',
-  'pot', 'potion', 'pumpkin', 'rocks', 'rocks_tall', 'shield', 'spear', 'stairs', 'sword', 'trap', 'trunk', 'urn'];
-const prop2Names = ['key', 'p_anvil', 'p_barrel_apples', 'p_bookcase', 'p_books', 'p_bookstand', 'p_bucket', 'p_cage',
-  'p_candlestick', 'p_cauldron', 'p_chalice', 'p_chain', 'p_coin_pile', 'p_dummy', 'p_pickaxe', 'p_pouch', 'p_rope',
-  'p_scroll', 'p_shield', 'p_sword', 'p_weaponstand', 'p_workbench', 'potion', 'r_barrel', 'r_beartrap', 'r_bricks',
-  'r_cart', 'r_column_round', 'r_column_square', 'r_crate', 'r_pot1', 'r_pot1_broken', 'r_pot2', 'r_pot3', 'r_skull',
-  'r_statue_fox', 'r_statue_stag', 'rts_gold1', 'rts_gold2', 'rts_logs', 'rts_pine', 'rts_rock', 'rts_rocks'];
+/* These two lists are injected from part_data.txt when the test bundle is
+   built. They used to be typed out by hand and had drifted 24 frames behind
+   the real atlas, so anything newly drawn silently rendered nothing here. */
+const propNames = __PROP_NAMES__;
+const prop2Names = __PROP2_NAMES__;
 const frames = names => {
   const f = {};
   names.forEach((nm, i) => { f[nm] = { x: (i % 8) * 160, y: ((i / 8) | 0) * 160, w: 160, h: 160, ax: 80, ay: 140 }; });

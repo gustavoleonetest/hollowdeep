@@ -828,17 +828,24 @@ function genLevel() {
 // [sprite, solid radius, scale, weight, lit radius]
 const PROP_POOL = [
   [['grave_round', 8, 1.5, 3], ['grave_cross', 8, 1.5, 2], ['grave_broken', 0, 1.5, 2], ['grave_bevel', 7, 1.5, 2], ['coffin', 0, 1.3, 1], ['urn', 5, 1.6, 2], ['candles', 0, 1.7, 2, 56], ['cross', 7, 1.3, 1], ['altar', 14, 1.1, 1],
-   ['r_column_round', 9, 1.1, 2], ['r_column_square', 9, 1.1, 1], ['r_statue_fox', 10, 1.15, 1], ['r_statue_stag', 10, 1.15, 1], ['r_skull', 0, 1.8, 2], ['r_bricks', 0, 1.3, 2], ['r_pot1', 7, 1.3, 2], ['r_pot1_broken', 0, 1.3, 1], ['p_candlestick', 5, 1.2, 2, 70], ['p_bookstand', 6, 1.2, 1], ['p_coin_pile', 0, 1.4, 1]],
+   ['r_column_round', 9, 1.1, 2], ['r_column_square', 9, 1.1, 1], ['r_statue_fox', 10, 1.15, 1], ['r_statue_stag', 10, 1.15, 1], ['r_skull', 0, 1.8, 2], ['r_bricks', 0, 1.3, 2], ['r_pot1', 7, 1.3, 2], ['r_pot1_broken', 0, 1.3, 1], ['p_candlestick', 5, 1.2, 2, 70], ['p_bookstand', 6, 1.2, 1], ['p_coin_pile', 0, 1.4, 1],
+   ['r_candles', 0, 1.7, 2, 56], ['p_vase', 6, 1.3, 2]],
   [['barrel', 9, 1.5, 3], ['pot', 8, 1.5, 3], ['rocks', 12, 1.1, 2], ['rocks_tall', 12, 1.1, 2], ['urn', 5, 1.6, 2], ['lantern', 4, 1.7, 2, 78], ['grave_broken', 0, 1.5, 1],
-   ['r_barrel', 9, 1.2, 2], ['r_crate', 9, 1.2, 2], ['p_bucket', 5, 1.3, 2], ['p_barrel_apples', 9, 1.15, 1], ['r_cart', 12, 1.0, 1], ['p_rope', 0, 1.5, 1], ['p_chain', 0, 1.3, 1], ['p_cage', 9, 1.15, 1], ['rts_logs', 0, 1.4, 1], ['p_bookcase', 12, 1.0, 1]],
+   ['r_barrel', 9, 1.2, 2], ['r_crate', 9, 1.2, 2], ['p_bucket', 5, 1.3, 2], ['p_barrel_apples', 9, 1.15, 1], ['r_cart', 12, 1.0, 1], ['p_rope', 0, 1.5, 1], ['p_chain', 0, 1.3, 1], ['p_cage', 9, 1.15, 1], ['rts_logs', 0, 1.4, 1], ['p_bookcase', 12, 1.0, 1],
+   ['p_table', 12, 1.0, 2], ['p_bench', 10, 1.1, 2], ['p_stool', 5, 1.2, 2], ['p_chair', 6, 1.15, 1],
+   ['p_crate_metal', 9, 1.2, 2], ['p_chest_wood', 9, 1.2, 1], ['p_stall', 12, 1.0, 1], ['p_bottles', 0, 1.4, 1]],
   [['trunk', 8, 1.5, 3], ['pumpkin', 0, 1.7, 2], ['rocks', 12, 1.1, 2], ['rocks_tall', 12, 1.1, 2], ['grave_broken', 0, 1.5, 1], ['pot', 8, 1.5, 1], ['lantern', 4, 1.7, 2, 78],
    ['rts_pine', 8, 1.15, 2], ['rts_rock', 10, 1.15, 2], ['rts_rocks', 12, 1.0, 2], ['r_beartrap', 0, 1.4, 1], ['p_bucket', 5, 1.3, 1], ['rts_logs', 0, 1.4, 2], ['r_pot3', 7, 1.3, 1], ['p_pickaxe', 0, 1.4, 1], ['rts_gold1', 10, 1.15, 1]],
   [['brazier', 8, 1.6, 3, 120], ['column', 9, 1.4, 2], ['pillar', 5, 1.5, 2], ['candles', 0, 1.7, 2, 56], ['trap', 0, 1.2, 2], ['altar', 14, 1.1, 1], ['urn', 5, 1.6, 1],
-   ['p_cauldron', 10, 1.15, 2], ['p_anvil', 8, 1.25, 2], ['p_weaponstand', 10, 1.0, 2], ['p_dummy', 9, 1.0, 1], ['p_workbench', 12, 1.0, 1], ['rts_gold2', 12, 1.0, 2], ['p_candlestick', 5, 1.2, 1, 70], ['r_column_square', 9, 1.1, 1], ['p_sword', 0, 1.5, 1], ['p_shield', 0, 1.4, 1]],
+   ['p_cauldron', 10, 1.15, 2], ['p_anvil', 8, 1.25, 2], ['p_weaponstand', 10, 1.0, 2], ['p_dummy', 9, 1.0, 1], ['p_workbench', 12, 1.0, 1], ['rts_gold2', 12, 1.0, 2], ['p_candlestick', 5, 1.2, 1, 70], ['r_column_square', 9, 1.1, 1], ['p_sword', 0, 1.5, 1], ['p_shield', 0, 1.4, 1],
+   ['p_bench', 10, 1.1, 2], ['p_stool', 5, 1.2, 1], ['p_crate_metal', 9, 1.2, 2], ['p_bottles', 0, 1.4, 1]],
   [['grave_round', 8, 1.5, 3], ['grave_cross', 8, 1.5, 3], ['grave_broken', 0, 1.5, 2], ['grave_bevel', 7, 1.5, 2], ['coffin', 0, 1.3, 2], ['cross', 7, 1.3, 2], ['r_skull', 0, 1.8, 3], ['candles', 0, 1.7, 2, 56],
-   ['urn', 5, 1.6, 2], ['altar', 14, 1.1, 1], ['r_statue_stag', 10, 1.15, 1], ['r_bricks', 0, 1.3, 2], ['p_bookstand', 6, 1.2, 1], ['rocks', 12, 1.1, 1], ['r_column_round', 9, 1.1, 2], ['p_pouch', 0, 1.4, 1]],
+   ['urn', 5, 1.6, 2], ['altar', 14, 1.1, 1], ['r_statue_stag', 10, 1.15, 1], ['r_bricks', 0, 1.3, 2], ['p_bookstand', 6, 1.2, 1], ['rocks', 12, 1.1, 1], ['r_column_round', 9, 1.1, 2], ['p_pouch', 0, 1.4, 1],
+   ['r_candles', 0, 1.7, 2, 56], ['p_vase', 6, 1.3, 1]],
   [['r_column_square', 9, 1.1, 3], ['pillar', 5, 1.5, 2], ['brazier', 8, 1.6, 2, 120], ['p_cauldron', 10, 1.15, 2], ['altar', 14, 1.1, 2], ['r_skull', 0, 1.8, 2], ['p_candlestick', 5, 1.2, 2, 70],
-   ['p_bookcase', 12, 1.0, 1], ['p_books', 0, 1.3, 1], ['p_scroll', 0, 1.4, 1], ['r_statue_fox', 10, 1.15, 1], ['rts_gold2', 12, 1.0, 1], ['p_chalice', 0, 1.5, 1], ['r_pot2', 7, 1.3, 2], ['trap', 0, 1.2, 1]]
+   ['p_bookcase', 12, 1.0, 1], ['p_books', 0, 1.3, 1], ['p_scroll', 0, 1.4, 1], ['r_statue_fox', 10, 1.15, 1], ['rts_gold2', 12, 1.0, 1], ['p_chalice', 0, 1.5, 1], ['r_pot2', 7, 1.3, 2], ['trap', 0, 1.2, 1],
+   ['r_bookcase', 12, 1.0, 2], ['p_table', 12, 1.0, 1], ['p_potion2', 0, 1.4, 1], ['p_bottles', 0, 1.4, 1],
+   ['r_pot2_broken', 0, 1.3, 1], ['p_vase', 6, 1.3, 1]]
 ];
 function makeProps() {
   const pool = PROP_POOL[G.zone.id], tw = pool.reduce((s, p) => s + p[3], 0), avoid = [];
@@ -1001,12 +1008,13 @@ function updateHazards(dt) {
 }
 
 /* ---------- breakable props ---------- */
-const MATCOL = { stone: ['#8d93a8', '#5b6275', '#d5d9e6'], clay: ['#a8643a', '#7a4426', '#d9a070'], metal: ['#9aa3b2', '#5d6574', '#eef2f8'], wood: ['#8a5a2e', '#5e3c1c', '#c9a062'], bone: ['#e8e0c8', '#b8ae92', '#ffffff'] };
+const MATCOL = { stone: ['#8d93a8', '#5b6275', '#d5d9e6'], clay: ['#a8643a', '#7a4426', '#d9a070'], metal: ['#9aa3b2', '#5d6574', '#eef2f8'], wood: ['#8a5a2e', '#5e3c1c', '#c9a062'], bone: ['#e8e0c8', '#b8ae92', '#ffffff'], glass: ['#9fd4e8', '#5d8ea8', '#ffffff'] };
 function propMat(k) {
   if (/^(grave|r_column|r_statue|altar|column|pillar|rocks|rts_rock|rts_gold|r_bricks|cross|coffin)/.test(k)) return 'stone';
   if (/^(pot|urn|r_pot|p_vase)/.test(k)) return 'clay';
   if (/(anvil|cauldron|chain|cage|brazier|trap|beartrap|sword|pickaxe|crate_metal|candlestick|lantern)/.test(k)) return 'metal';
   if (/skull/.test(k)) return 'bone';
+  if (/(bottles|potion2|chalice)/.test(k)) return 'glass';
   return 'wood';
 }
 function hurtProp(p, dmg, ang) {
@@ -2244,6 +2252,10 @@ function shadow(x, y, rx, ry, a) {
 let baked = null, bakedVer = -1, bakedBS = 0;
 const wallAt = (tx, ty) => tx < 0 || ty < 0 || tx >= MW || ty >= MH || G.map[ty * MW + tx] === 1;
 function bakeDoor(b, px, py) {
+  /* only the frame is baked now: drawDoor puts the gate itself on top, lit */
+  b.fillStyle = '#241a12'; b.fillRect(px, py, T, T);
+  b.fillStyle = '#3a2a1c'; b.fillRect(px + 1, py + 1, T - 2, T - 2);
+  if (sprOk('props')) return;
   b.fillStyle = '#6e4626'; b.fillRect(px + 2, py + 1, T - 4, T - 2);
   for (let i = 0; i < 4; i++) { b.fillStyle = i % 2 ? '#7a4e2a' : '#69421f'; b.fillRect(px + 3 + i * 7, py + 2, 6, T - 4); b.fillStyle = 'rgba(0,0,0,.25)'; b.fillRect(px + 8 + i * 7, py + 2, 1, T - 4); }
   b.fillStyle = '#3a3f4f'; b.fillRect(px + 2, py + 6, T - 4, 3); b.fillRect(px + 2, py + T - 10, T - 4, 3);
@@ -3365,6 +3377,29 @@ function drawNest(n) {
   if (hurt && Math.random() < .25) G.parts.push({ x: x + rnd(-12, 12), y: y + rnd(-6, 8), vx: rnd(-.2, .2), vy: -.5, life: .45, max: .45, col: '#ff8a3a', s: 2, k: 'ember' });
   const w = 34; ctx.fillStyle = '#0a0c11'; ctx.fillRect(x - w / 2, y - 34, w, 4); ctx.fillStyle = C.blood; ctx.fillRect(x - w / 2, y - 34, w * n.hp / n.max, 4);
 }
+function drawDoor() {
+  const d = G.door;
+  if (!d || !G.map || G.map[d.y * MW + d.x] !== 2) return;
+  const x = d.x * T + T / 2, y = d.y * T + T / 2;
+  if (fogAt(x, y) > .85) return;
+  const p = (Math.sin(clock * 2.2) + 1) / 2;
+  /* it strains when you are near without the key, and settles when you hold one */
+  const near = G.players.some(q => !q.down && Math.hypot(q.x - x, q.y - y) < 70);
+  const held = G.keys > 0;
+  const rattle = (near && !held) ? Math.sin(clock * 24) * 1.1 : 0;
+  shadow(x, y + 13, 14, 5, .4);
+  glow(x, y, 34, held ? '#f0a23c' : '#8d93a8', (held ? .34 : .16) + p * .1);
+  if (!sprProp('gate', x + rattle, y + 13, 1.45)) return;
+  /* the lock reads gold once a key is in hand, so the door tells you itself */
+  ctx.save();
+  ctx.globalAlpha = .75 + p * .25;
+  ctx.fillStyle = held ? '#ffd24a' : '#6e7d97';
+  ctx.beginPath(); ctx.arc(x, y - 1, 3.4, 0, TAU); ctx.fill();
+  ctx.fillStyle = held ? '#fff6d8' : '#3a4152';
+  ctx.fillRect(x - .9, y - 1, 1.8, 4);
+  ctx.restore(); ctx.globalAlpha = 1;
+  if (held && Math.random() < .12) G.parts.push({ x: x + rnd(-10, 10), y: y + rnd(-10, 6), vx: 0, vy: -.4, life: .5, max: .5, col: '#ffd24a', s: 2, k: 'ember' });
+}
 function drawExit() {
   if (!sprOk('props')) return drawExitOld();
   const e = G.exit, p = (Math.sin(clock * 3) + 1) / 2;
@@ -3708,7 +3743,7 @@ function render() {
   if (mh < vh) cam.y = (mh - vh) / 2; else cam.y += (ty - cam.y) * .14;
   const sh = (G.shake > 0 && !reduceMotion) ? G.shake * 14 : 0, ox = (Math.random() - .5) * sh, oy = (Math.random() - .5) * sh, k = DPR * Z;
   ctx.setTransform(k, 0, 0, k, (-cam.x + ox) * k, (-cam.y + oy) * k);
-  drawTiles(); drawDecals(); drawArena(); drawExit(); for (const t of G.torches) drawTorch(t);
+  drawTiles(); drawDecals(); drawArena(); drawExit(); drawDoor(); for (const t of G.torches) drawTorch(t);
   for (const i of G.items) drawItem(i);
   const ents = [];
   for (const n of G.nests) ents.push([n.y, n, drawNest]);
