@@ -264,6 +264,24 @@ function loadMeta() {
   } catch (e) {}
 }
 function saveMeta() { try { localStorage.setItem(META_KEY, JSON.stringify(META)); } catch (e) {} }
+/* Write something, read it back, take it away again. Nothing short of the
+   round trip will do: a private window hands you a store that reads fine and
+   throws only when you try to keep something, and some setups throw on the
+   mere mention of localStorage. Asked once and remembered, since this cannot
+   change while the page is open -- `recheck` is for the tests. */
+let storageOk = null;
+function storageWorks(recheck) {
+  if (storageOk !== null && !recheck) return storageOk;
+  storageOk = false;
+  try {
+    const k = 'hollowdeep-probe', v = String(Date.now());
+    localStorage.setItem(k, v);
+    const back = localStorage.getItem(k);
+    localStorage.removeItem(k);
+    storageOk = back === v;
+  } catch (e) { storageOk = false; }
+  return storageOk;
+}
 /* ---------- the run you left behind ---------- */
 const RUN_KEY = 'hollowdeep-run';
 let pendingRun = null;
@@ -4147,7 +4165,10 @@ function refreshResume() {
   row.hidden = !pendingRun;
   if (pendingRun) $('resume').textContent = 'Carry on from depth ' + pendingRun.level;
 }
-function showMenu() { syncOpts(); setMode(mode); $('menu').hidden = false; $('over').hidden = true; $('barrow').hidden = true; $('hud').hidden = true; G.state = 'menu'; $('best').textContent = G.best; $('echoes').textContent = META.echoes; refreshResume(); const f = pendingRun ? $('resume') : document.querySelector('#cards .card'); if (f) f.focus({ preventScroll: true }); }
+function showMenu() {
+  /* said in the menu only: nobody needs this over the top of a fight */
+  { const n = $('noSave'); if (n) n.hidden = storageWorks(); }
+  syncOpts(); setMode(mode); $('menu').hidden = false; $('over').hidden = true; $('barrow').hidden = true; $('hud').hidden = true; G.state = 'menu'; $('best').textContent = G.best; $('echoes').textContent = META.echoes; refreshResume(); const f = pendingRun ? $('resume') : document.querySelector('#cards .card'); if (f) f.focus({ preventScroll: true }); }
 function begin(list) { initAudio(); startGame(list); saveRun(); $('menu').hidden = true; $('over').hidden = true; $('hud').hidden = false; cam.x = G.player.x - W / Z / 2; cam.y = G.player.y - H / Z / 2; }
 $('again').addEventListener('click', () => { if (G.state === 'won') { G.state = 'dead'; bankRun(); } begin(G.clsKeys); });
 $('deeper').addEventListener('click', () => {
@@ -4372,6 +4393,7 @@ function frame(now) {
   } catch (e) { frameError(e); }
   perfTick(performance.now() - _t0);
 }
+storageWorks();
 loadMeta(); G.best = META.best || 0;
 pendingRun = loadRun();
 { /* a trophy line, once there is something to show */

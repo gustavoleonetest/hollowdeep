@@ -112,19 +112,21 @@ body{
 @media (max-width:520px){.srow{grid-template-columns:1fr}.sbuy{justify-content:flex-start}}
 @media (max-width:520px){.bar h1{font-size:26px}.sheet h2{font-size:30px}}
 .phoneonly{display:none}
+.sheet .nosave{color:#f0a23c; border-left:3px solid #f0a23c; padding-left:10px}
 /* On a narrow screen the delvers come up to meet you: title, the run you
    left, how many of you there are, then the cards. The blurb keeps every
    word it had and waits below, where it is still there for anyone who
    wants it. Nothing changes on a wider screen. */
 @media (max-width:520px){
   #menu .sheet h2{order:1}
-  #menu .sheet #resumeRow{order:2}
-  #menu .sheet #modes{order:3}
-  #menu .sheet #miniHint{order:4; display:block}
-  #menu .sheet #pickHint{order:5}
-  #menu .sheet #cards{order:6}
-  #menu .sheet #opts{order:7}
-  #menu .sheet .sub{order:8}
+  #menu .sheet #noSave{order:2}
+  #menu .sheet #resumeRow{order:3}
+  #menu .sheet #modes{order:4}
+  #menu .sheet #miniHint{order:5; display:block}
+  #menu .sheet #pickHint{order:6}
+  #menu .sheet #cards{order:7}
+  #menu .sheet #opts{order:8}
+  #menu .sheet .sub{order:9}
 }
 </style>
 <div class="bar">
@@ -170,6 +172,7 @@ body{
     <div class="sheet">
       <h2>Pick a delver and go down.</h2>
       <p class="sub">Smash the crypts, take the key, unlock the door, find the stairs. <b>Your health drains the whole way down</b>, so food is the only clock that matters. Monsters drop rolled gear — weapons, armour and trinkets with their own affixes — and kills earn levels. Keep a potion for when the floor turns against you. <b>The Hollow Heart waits at depth 21</b> — put it down and the deep is yours. Best run: <span class="big" id="best">0</span><span id="menuWins"></span></p>
+      <p class="sub nosave" id="noSave" hidden>This browser will not let the game keep anything. You can play, but echoes, the Barrow and carrying on where you left off will all be gone when you close the tab.</p>
       <div class="row" id="resumeRow" hidden>
         <button class="btn" id="resume" type="button">Carry on</button>
         <button class="btn alt" id="abandon" type="button">Leave it down there</button>
