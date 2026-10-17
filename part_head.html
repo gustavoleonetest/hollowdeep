@@ -58,6 +58,7 @@ body{
 #mini{position:absolute; right:10px; bottom:10px; width:min(156px,30vw); height:auto; background:rgba(12,14,19,.74); border:1px solid var(--line); image-rendering:pixelated; pointer-events:none}
 #dashBtn{display:none; position:absolute; right:10px; bottom:calc(min(156px,30vw)*.73 + 22px); width:64px; height:64px; border-radius:50%; border:1px solid var(--cyan); background:rgba(12,14,19,.7); color:var(--cyan); font:600 11px var(--mono); letter-spacing:.08em}
 @media (pointer:coarse){#stage.playing #dashBtn{display:block}}
+@media (max-height:560px){ body.playing .bar p{display:none} body.playing .bar{padding-bottom:2px} }
 .touchhelp{display:none}
 @media (pointer:coarse){
   .kbdhelp{display:none}

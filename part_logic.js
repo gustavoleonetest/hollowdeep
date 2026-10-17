@@ -4247,6 +4247,7 @@ function frame(now) {
       st.dataset.play = on ? '1' : '0';
       st.classList.toggle('playing', on);
       if (document.body && document.body.classList) document.body.classList.toggle('playing', on);
+      try { btnsOn = getComputedStyle($('dashBtn')).display !== 'none'; } catch (e) {}
     } }
   if (G.state === 'offer' && !lootShown) { lootShown = true; showLoot(); } else if (G.state !== 'offer' && lootShown) { lootShown = false; $('loot').hidden = true; }
   if (W && H && G.map) { if (G.state === 'play' || G.state === 'offer' || G.state === 'shop' || G.state === 'clear') updateHud(); render(); }

@@ -1855,6 +1855,56 @@ ok('not to the first', G.players[0].dmgMul === first0);
   hide(wasHidden); G.state = 'play'; G.paused = false;
 }
 
+/* ---------------- nothing grows without limit ---------------- */
+{
+  /* A run can last half an hour, and anything that only ever gets pushed to
+     will eventually cost frames. The ceilings below are what the game
+     actually reached over three passes of sixteen depths of constant
+     fighting, with room left over: particles peaked at 322 against their cap
+     of 1400, foes at 45, crypts at 47, props at 63, and nothing else got
+     past single figures. A list that sails past these is growing, not busy. */
+  const CEILING = {
+    parts: 1400, enemies: 60, nests: 90, props: 160, torches: 60, hazards: 40,
+    texts: 200, fxs: 200, decals: 120, dying: 60, shots: 300, eshots: 400,
+    zones: 300, timers: 200,
+  };
+  const over = [];
+  startGame(['ember']);
+  for (let depth = 1; depth <= 14; depth++) {
+    G.level = depth; genLevel();
+    let gg = 0; while (G.offer && gg++ < 30) applyUpgrade(0);
+    G.offerQ.length = 0; G.state = 'play';
+    const P = G.players[0];
+    for (let i = 0; i < 240; i++) {
+      P.inv = 1e9; P.hp = P.max;
+      INS[0].mx = Math.cos(i / 25); INS[0].my = Math.sin(i / 25); INS[0].fire = true;
+      readInput(); update(1 / 60);
+      if (G.state !== 'play') G.state = 'play';
+      for (const k in CEILING) {
+        const n = (G[k] && G[k].length) || 0;
+        if (n > CEILING[k]) over.push(k + ' ' + n + ' at depth ' + depth);
+      }
+    }
+  }
+  INS[0].fire = false; INS[0].mx = 0; INS[0].my = 0;
+  ok('no list runs away over a long descent', over.length === 0, over.slice(0, 3).join(', ') || 'all within bounds');
+}
+
+/* ---------------- the touch controls know they are showing ---------------- */
+{
+  /* btnsOn decides where the narrator's line sits and what the pause overlay
+     tells you to press, so it has to match what is actually on screen. */
+  const shown = () => { try { return getComputedStyle($('dashBtn')).display !== 'none'; } catch (e) { return false; } };
+  startGame(['bulwark']); G.level = 2; genLevel(); G.state = 'play';
+  $('hud').hidden = false;
+  frame(performance.now());
+  ok('the flag matches what is on screen in play', btnsOn === shown(), btnsOn + ' vs ' + shown());
+  $('hud').hidden = true;
+  frame(performance.now());
+  ok('and when the run is not running', btnsOn === shown(), btnsOn + ' vs ' + shown());
+  $('hud').hidden = false;
+}
+
 const fails = results.filter(r => r[0] === 'FAIL');
 for (const [st, n, x] of results) console.log(st + '  ' + n + (x ? '  [' + x + ']' : ''));
 console.log('\n' + (results.length - fails.length) + '/' + results.length + ' checks passed');
