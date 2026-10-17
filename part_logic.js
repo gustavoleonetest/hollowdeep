@@ -161,6 +161,13 @@ const SFXF = {
   boom: t => { tone(t, 125, .5, 'sine', .17, null, 32); nz(t, .4, .14, 'lowpass', 900); nz(t, .12, .07, 'highpass', 2200); },
   bone: t => { nz(t, .05, .08, 'bandpass', 2200, 3); tone(t, 430, .05, 'square', .035, null, 300); },
   door: t => { tone(t, 92, .35, 'sine', .13, null, 50); nz(t, .18, .06, 'lowpass', 520); },
+  omen: t => {
+    tone(t, 70, 1.5, 'sine', .11, null, 58);
+    tone(t + .06, 99, 1.35, 'triangle', .05, null, 92);
+    tone(t + .12, 140, 1.1, 'sine', .035, null, 132);
+    nz(t, 1.3, .045, 'lowpass', 420);
+    nz(t + .1, .5, .02, 'bandpass', 1300, .8);
+  },
   stairs: t => { [0, 4, 7, 12].forEach((s, i) => tone(t + i * .07, 330 * Math.pow(2, s / 12), .3, 'triangle', .055)); },
   level: t => { [0, 4, 7, 12, 16].forEach((s, i) => tone(t + i * .08, 392 * Math.pow(2, s / 12), .45, 'triangle', .06)); nz(t, .5, .025, 'highpass', 3000); },
   elite: t => { tone(t, 150, .7, 'sawtooth', .09, null, 110); tone(t + .02, 159, .7, 'sawtooth', .07, null, 117); nz(t, .5, .06, 'lowpass', 600); },
@@ -843,7 +850,7 @@ function genLevel() {
   G.bolts = []; G.voice = null; G.flash = 0; G.offer = null; G.offerQ = []; G.zones = []; G.timers = [];
   G.flowT = 0;
   G.banner = { txt: isFinalLvl(G.level) ? 'Depth ' + G.level : 'Depth ' + G.level, sub: isFinalLvl(G.level) ? 'The Hollow \u00b7 ' + HEART_NAME + ' waits' : G.zone.name + (isBossLvl(G.level) ? ' \u00b7 ' + G.zone.boss + ' guards the key' : G.omen ? ' \u00b7 ' + G.omen.name : ''), t: 2.8, omen: !!G.omen };
-  if (G.omen) announceOnce('omen' + G.level, 6, G.omen.name + '. ' + G.omen.line, G.omen.col);
+  if (G.omen) { sfx('omen'); announceOnce('omen' + G.level, 6, G.omen.name + '. ' + G.omen.line, G.omen.col); }
   G.mapVer = (G.mapVer || 0) + 1;
 }
 // [sprite, solid radius, scale, weight, lit radius]
@@ -1671,7 +1678,7 @@ function clearTick(dt) {
   for (const P of G.players) P.cheer = Math.max(0, (P.cheer || 0) - dt);
   if (G.clearT >= 1.5) G.state = 'shop';
 }
-function leaveShop() { if (G.state !== 'shop') return; G.state = 'play'; nextLevel(); }
+function leaveShop() { if (G.state !== 'shop') return; nextLevel(); G.state = 'play'; }
 
 /* ---------- updates ---------- */
 function updatePlayer(P, I, dt) {
