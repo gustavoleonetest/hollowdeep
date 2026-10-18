@@ -1521,6 +1521,20 @@ function hurtFoe(e, dmg, ang, crit, burn, src) {
   if (dmg >= 40 || e.boss || e.type === 'brute') G.shake = Math.max(G.shake, .08);
   if (src) {
     applyElem(e, src, dmg);
+    /* Spiny: it pricks whoever is close enough to have struck it. Its own
+       cooldown rather than the delver's invulnerability, so being pricked
+       never becomes a shield against the thing doing the pricking. */
+    if (e.eaff && e.eaff.indexOf('spiny') >= 0 && src.cls && !src.down &&
+        (!e.spineT || clock - e.spineT > .45) &&
+        Math.hypot(src.x - e.x, src.y - e.y) < e.r + (src.r || 11) + 26) {
+      e.spineT = clock;
+      const back = Math.max(1, Math.round(e.dmg * .35)), was = src.hp;
+      src.hp -= back; toll('foes', was, src);
+      src.hurt = Math.max(src.hurt, .18);
+      text(src.x, src.y - 16, '-' + back, '#9bd16a');
+      burst(src.x, src.y, '#9bd16a', 6, 90, .8, 'spark');
+      if (src.hp <= 0) downPlayer(src);
+    }
     if (src.g && src.g.leech > 0 && !src.down && src.hp < src.max) {
       src.hp = Math.min(src.max, src.hp + dmg * src.g.leech);
       if (Math.random() < .4) G.parts.push({ x: e.x, y: e.y, vx: (src.x - e.x) * .02, vy: (src.y - e.y) * .02, life: .4, max: .4, col: '#d9534f', s: 2.2 });
