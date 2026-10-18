@@ -2772,6 +2772,21 @@ ok('not to the first', G.players[0].dmgMul === first0);
        back === 'kept' && localStorage.getItem(k) === null, String(back));
   }
 
+  /* handlers, which a UI check has to be able to press */
+  {
+    const b = node();
+    let hits = 0;
+    const fn = () => hits++;
+    b.addEventListener('click', fn);
+    const fired = b.dispatch('click');
+    b.removeEventListener('click', fn);
+    const after = b.dispatch('click');
+    ok('[harness] a handler that was added can be pressed', fired === 1 && hits === 1, fired + '/' + hits);
+    ok('[harness] and one that was removed cannot', after === 0 && hits === 1, after + '/' + hits);
+    ok('[harness] pressing something with no handler is not mistaken for success',
+       node().dispatch('click') === 0);
+  }
+
   /* pixels: the stub does not rasterise, and must say so rather than hand
      back a plausible array of zeros */
   {
@@ -3346,6 +3361,145 @@ ok('not to the first', G.players[0].dmgMul === first0);
     let err = null;
     try { listen(drawMini); } catch (e) { err = e; }
     ok('an unexplored floor draws without complaint', err === null, err ? String(err.message) : 'drew');
+  }
+}
+
+/* ---------------- who you have become ---------------- */
+{
+  const piece = (slot, name, stats, setId) => ({
+    slot, base: 'Thing', rar: 'rare', col: '#ffd24a', name,
+    s: stats || {}, ilvl: 5, set: setId || null,
+    setName: setId ? (SETS.find(x => x.id === setId) || {}).name : null
+  });
+  const text = () => $('pauseGear').textContent + ' ' + $('pauseS').textContent + ' ' + $('pauseExtra').textContent;
+
+  startGame(['ember']); G.level = 6; genLevel();
+  G.offer = null; G.offerQ.length = 0; G.state = 'play';
+  const P = G.players[0];
+  P.gear.weapon = piece('weapon', 'Rime Hollowblade', { dmg: .2, elem: 'cold', elemDmg: .4 });
+  P.gear.armour = piece('armour', 'Swift Gravemail', { arm: .1, hp: 30 }, 'quick');
+  P.gear.trinket = null;
+  P.boons = { pyre: 1 };
+  P.pacts = [PACTS.find(q => q.id === 'embers')];
+  recalc(P); P.hp = P.max;
+
+  /* 1. pausing puts it on screen, by whichever route the pause came */
+  {
+    G.paused = false; pauseShown = false; $('paused').hidden = true;
+    G.paused = true;
+    frame(0);                         /* one turn of the real loop */
+    ok('pausing shows the sheet', $('paused').hidden === false, 'hidden ' + $('paused').hidden);
+    /* the overlay dims rather than hides, so the HUD would otherwise show
+       through the sheet -- on a phone, right across the heading */
+    ok('and takes the HUD out from under it', $('hud').hidden === true, 'hud hidden ' + $('hud').hidden);
+    ok('and it names what is worn',
+       /Rime Hollowblade/.test(text()) && /Swift Gravemail/.test(text()), text().slice(0, 120));
+    ok('an empty slot says so rather than being left out',
+       /Nothing worn|That slot is empty/.test(text()), text().slice(0, 160));
+  }
+
+  /* 2. everything a tooltip used to hide is on it */
+  {
+    const t = text();
+    ok('the stats of each piece are there', /\+20% damage/.test(t), t.slice(0, 160));
+    ok('so is the element, with its magnitude', /Cold damage: \+40%/.test(t), t.slice(0, 200));
+    ok('so is the set', /The Quickened/.test(t), t.slice(0, 200));
+    ok('and the boons and pacts', /Pyre/.test(t) && /Pact of Embers/.test(t), $('pauseExtra').textContent);
+    ok('with the delver’s own line above it', /Ember/.test($('pauseS').textContent),
+       $('pauseS').textContent.slice(0, 120));
+  }
+
+  /* 3. a card on the sheet is a thing to read, not a thing to pick: the
+        offer screen reuses this card and its click equips something */
+  {
+    const cards = $('pauseGear').children;
+    ok('three slots are shown', cards.length === 3, String(cards.length));
+    const chosen = [];
+    const real = applyUpgrade;
+    applyUpgrade = i => chosen.push(i);
+    let fired = 0;
+    try { for (const c of cards) fired += c.dispatch('click'); } finally { applyUpgrade = real; }
+    ok('and clicking one picks nothing', chosen.length === 0 && fired === 0,
+       fired + ' handlers on a card that is only there to be read');
+    /* The control: if the card were simply broken everywhere, the check
+       above would pass for the wrong reason. An offered card must carry
+       exactly the handler a read-only one does not. */
+    const offered = { slot: 'weapon', base: 'B', rar: 'magic', col: '#fff',
+      name: 'Offered', s: { dmg: .1 }, ilvl: 1, set: null, setName: null };
+    const live = gearCard('New', offered, 0, '1', P, null);
+    const readOnly = gearCard('Worn', offered, -1, '', P, null);
+    ok('an offered card carries the handler a shown one does not',
+       (live._on && live._on.click || []).length === 1 &&
+       !(readOnly._on && readOnly._on.click || []).length,
+       'offered ' + ((live._on && live._on.click) || []).length +
+       ', shown ' + (((readOnly._on && readOnly._on.click) || []).length));
+
+    /* and with a real offer in flight it picks for real. chooseUp refuses
+       unless the game is actually offering something, which is why the
+       first attempt at this check proved nothing. */
+    const wasW = P.gear.weapon;
+    G.offer = { kind: 'gear', P, item: offered, cur: wasW };
+    G.state = 'offer';
+    gearCard('New', offered, 0, '1', P, null).dispatch('click');
+    ok('and pressing it with an offer in flight equips the thing',
+       P.gear.weapon === offered, P.gear.weapon ? P.gear.weapon.name : 'nothing');
+    G.offer = null; G.state = 'play'; P.gear.weapon = wasW; recalc(P);
+  }
+
+  /* 4. unpausing takes it away again */
+  {
+    G.paused = false;
+    frame(0);
+    ok('carrying on hides it', $('paused').hidden === true, 'hidden ' + $('paused').hidden);
+    ok('and gives the HUD back', $('hud').hidden === false, 'hud hidden ' + $('hud').hidden);
+  }
+
+  /* 5. THE TRAP: the sheet covers the canvas, and tapping the canvas was
+        the only way back in for a touch player. The overlay has to resume. */
+  {
+    G.paused = true; frame(0);
+    ok('the sheet is up', $('paused').hidden === false);
+    const resumed = resumeFromPause();
+    ok('and the overlay itself can let you back in', resumed === true && G.paused === false,
+       'resumed ' + resumed + ', paused ' + G.paused);
+    frame(0);
+    ok('after which it is gone', $('paused').hidden === true);
+  }
+
+  /* 6. it is only ever up during play, never over a menu or a death */
+  {
+    const wrong = [];
+    for (const st of ['menu', 'dead', 'won', 'offer', 'shop']) {
+      G.state = st; G.paused = true; frame(0);
+      if (!$('paused').hidden) wrong.push(st);
+      G.paused = false; frame(0);
+    }
+    G.state = 'play';
+    ok('and never over anything that is not play', wrong.length === 0, wrong.join(','));
+
+    /* a pause that ends because the delver died must not hand the HUD back
+       over the top of the death screen */
+    G.paused = true; frame(0);
+    $('hud').hidden = true; G.state = 'dead'; G.paused = false; frame(0);
+    ok('a pause ending in death leaves the HUD where the death screen put it',
+       $('hud').hidden === true, 'hud hidden ' + $('hud').hidden);
+    G.state = 'play'; $('hud').hidden = false;
+  }
+
+  /* 7. two delvers each get their own */
+  {
+    startGame(['bulwark', 'sable']); G.level = 3; genLevel();
+    G.offer = null; G.offerQ.length = 0; G.state = 'play';
+    G.players[0].gear.weapon = piece('weapon', 'Ones Blade', { dmg: .1 });
+    G.players[1].gear.weapon = piece('weapon', 'Twos Dagger', { dmg: .1 });
+    recalc(G.players[0]); recalc(G.players[1]);
+    G.paused = false; pauseShown = false; G.paused = true; frame(0);
+    ok('in co-op both delvers are laid out', $('pauseGear').children.length === 6,
+       String($('pauseGear').children.length));
+    const t = text();
+    ok('each named so you can tell whose is whose', /P1/.test(t) && /P2/.test(t), t.slice(0, 100));
+    ok('and both blades are on it', /Ones Blade/.test(t) && /Twos Dagger/.test(t), t.slice(0, 160));
+    G.paused = false; frame(0);
   }
 }
 

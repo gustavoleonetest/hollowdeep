@@ -4056,14 +4056,7 @@ function drawScreenFx() {
     ctx.fillStyle = v.col; ctx.fillText(v.txt, W / 2, vy);
     ctx.globalAlpha = 1;
   }
-  if (G.paused) {
-    ctx.fillStyle = 'rgba(6,8,12,.6)'; ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = C.bone; ctx.font = '400 54px "Pirata One",Georgia,serif'; ctx.textAlign = 'center';
-    ctx.fillText('Paused', W / 2, H / 2 - 14);
-    ctx.fillStyle = '#98a0b3'; ctx.font = '400 15px "Spline Sans Mono",monospace';
-    ctx.fillText(btnsOn ? 'Tap to carry on' : 'Press P, or click, to carry on', W / 2, H / 2 + 26);
-    ctx.textAlign = 'left';
-  }
+  /* the pause sheet is an overlay now, and dims the stage itself */
   for (const k of ['move', 'aim']) { const s = touch[k]; if (!s) continue; ctx.strokeStyle = 'rgba(235,228,210,.35)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(s.ox, s.oy, 50, 0, TAU); ctx.stroke(); ctx.fillStyle = 'rgba(235,228,210,.35)'; ctx.beginPath(); ctx.arc(s.ox + clamp(s.x - s.ox, -50, 50), s.oy + clamp(s.y - s.oy, -50, 50), 18, 0, TAU); ctx.fill(); }
 }
 function render() {
@@ -4277,6 +4270,7 @@ function syncOpts() {
 $('optMotion').addEventListener('click', () => { reduceMotion = !reduceMotion; META.reduceMotion = reduceMotion; saveMeta(); syncOpts(); });
 $('optVoice').addEventListener('click', () => { voiceOn = !voiceOn; META.voice = voiceOn; saveMeta(); syncOpts(); if (!voiceOn && typeof speechSynthesis !== 'undefined') { try { speechSynthesis.cancel(); } catch (e) {} } });
 $('optMusic').addEventListener('click', () => { musicOn = !musicOn; META.music = musicOn; saveMeta(); syncOpts(); setMix(G.state === 'play'); });
+$('paused').addEventListener('click', () => { resumeFromPause(); });
 $('resume').addEventListener('click', () => {
   if (!pendingRun) return;
   initAudio(); const at = pendingRun.level; resumeRun(pendingRun); pendingRun = null;
@@ -4371,7 +4365,31 @@ function renderBarrow() {
   }
 }
 function showBarrow(on) { $('barrow').hidden = !on; if (on) { renderBarrow(); $('barrowBack').focus({ preventScroll: true }); } }
-let lootShown = false;
+let lootShown = false, pauseShown = false;
+/* What you are carrying, and what it has made of you. */
+function showPaused() {
+  const wrap = $('pauseGear'); wrap.innerHTML = '';
+  const sheets = [], extras = [];
+  for (const P of G.players) {
+    const who = G.co ? 'P' + (P.idx + 1) + ' \u00b7 ' : '';
+    sheets.push(who + sheetLine(P));
+    for (const slot of SLOTS) {
+      wrap.appendChild(gearCard(who + slot, P.gear[slot], -1, '', P, null));
+    }
+    const boons = (BOONS[P.cls.key] || []).filter(b => bn(P, b.id)).map(b => b.name);
+    const pacts = (P.pacts || []).map(q => q.name);
+    const bits = [];
+    if (boons.length) bits.push('Boons: ' + boons.join(', '));
+    if (pacts.length) bits.push('Pacts: ' + pacts.join(', '));
+    if (bits.length) extras.push(who + bits.join('  \u00b7  '));
+  }
+  $('pauseS').textContent = sheets.join('   |   ');
+  $('pauseExtra').textContent = extras.join('   |   ');
+  $('pauseExtra').hidden = extras.length === 0;
+  $('pauseHint').textContent = btnsOn ? 'Tap anywhere to carry on.' : 'Press P, or click, to carry on.';
+  $('hud').hidden = true;
+  $('paused').hidden = false;
+}
 function sheetLine(P) {
   const pct = x => Math.round((x - 1) * 100);
   let line = P.cls.name + ' \u00b7 level ' + P.plvl + ' \u00b7 ' + P.max + ' max health, damage +' + pct(P.dmgMul) + '%, speed +' + pct(P.spdMul) + '%, attacks ' + pct(1 / P.cdMul) + '% faster.';
@@ -4396,7 +4414,9 @@ function gearCard(label, item, idx, hint, who, breaks) {
     b.appendChild(w);
   }
   const h = document.createElement('span'); h.className = 'rare'; h.textContent = hint; b.appendChild(h);
-  b.addEventListener('click', () => chooseUp(idx));
+  /* idx below zero means this card is being shown, not offered */
+  if (idx >= 0) b.addEventListener('click', () => chooseUp(idx));
+  else b.tabIndex = -1;
   return b;
 }
 function showLoot() {
@@ -4507,6 +4527,12 @@ function frame(now) {
       try { btnsOn = getComputedStyle($('dashBtn')).display !== 'none'; } catch (e) {}
     } }
   if (G.state === 'offer' && !lootShown) { lootShown = true; showLoot(); } else if (G.state !== 'offer' && lootShown) { lootShown = false; $('loot').hidden = true; }
+  const wantPause = G.paused && G.state === 'play';
+  if (wantPause && !pauseShown) { pauseShown = true; showPaused(); }
+  else if (!wantPause && pauseShown) {
+    pauseShown = false; $('paused').hidden = true;
+    if (G.state === 'play') $('hud').hidden = false;
+  }
   if (W && H && G.map) { if (G.state === 'play' || G.state === 'offer' || G.state === 'shop' || G.state === 'clear') updateHud(); render(); }
   } catch (e) { frameError(e); }
   perfTick(performance.now() - _t0);

@@ -49,7 +49,21 @@ function el(id) {
     children: [], value: '', title: '', _text: '', _html: '',
     hidden: false, disabled: false, type: '', className: '',
     clientWidth: 960, clientHeight: 600, width: 160, height: 160,
-    addEventListener() {}, removeEventListener() {}, appendChild(c) { this.children.push(c); return c; },
+    _on: null,
+    addEventListener(type, fn) {
+      if (typeof fn !== 'function') return;
+      (this._on || (this._on = {}))[type] = (this._on[type] || []).concat(fn);
+    },
+    removeEventListener(type, fn) {
+      if (this._on && this._on[type]) this._on[type] = this._on[type].filter(f => f !== fn);
+    },
+    /* what a test uses to actually press the thing */
+    dispatch(type, ev) {
+      const fns = (this._on && this._on[type]) || [];
+      for (const f of fns) f(ev || { type, preventDefault() {}, stopPropagation() {} });
+      return fns.length;
+    },
+    appendChild(c) { this.children.push(c); return c; },
     focus() {}, blur() {}, setPointerCapture() {}, releasePointerCapture() {},
     getBoundingClientRect: () => ({ left: 0, top: 0, width: 960, height: 600, right: 960, bottom: 600 }),
     /* A stand-in, not a match. This stub builds a tree from createElement and
