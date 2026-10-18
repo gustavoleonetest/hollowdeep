@@ -3357,6 +3357,27 @@ ok('not to the first', G.players[0].dmgMul === first0);
        disc ? disc.col + ' vs ' + shrineCol({ kind: 'pact' }) : 'no disc');
   }
 
+  /* the way down is drawn over everything else, not under it: a crypt
+     beside the stairs or a loaf dropped on them used to paint over it */
+  {
+    G.items.length = 0; G.nests.length = 0;
+    const ex = G.exit;
+    /* put a crypt and a loaf exactly on the stairs, the worst case */
+    G.nests.push({ x: ex.x, y: ex.y, hp: 10, max: 10, r: 12, t: 0, flash: 0 });
+    G.items.push({ kind: 'food', x: ex.x, y: ex.y, t: 0 });
+    G.items.push({ kind: 'chest', x: ex.x, y: ex.y, t: 0, big: false });
+    seeAll();
+    const sh = listen(drawMini);
+    const ringAt = sh.findIndex(s => s.form === 'ring');
+    const lastOther = Math.max(
+      sh.map((s, i) => (s.form === 'lines' || bars([s]).length || diamonds([s]).length) ? i : -1)
+        .reduce((a, b) => Math.max(a, b), -1), -1);
+    ok('the way down is drawn after everything standing on it',
+       ringAt >= 0 && ringAt > lastOther,
+       'ring at ' + ringAt + ', last of the rest at ' + lastOther);
+    G.items.length = 0; G.nests.length = 0;
+  }
+
   /* several loaves all get marked: this is a memory, not a hint */
   {
     G.items.length = 0;

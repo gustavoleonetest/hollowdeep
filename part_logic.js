@@ -3976,8 +3976,8 @@ function drawMini() {
   const markRing = (x, y, c) => {
     if (!seenAt(x, y)) return;
     mctx.strokeStyle = c; mctx.lineWidth = 1.5;
-    mctx.beginPath(); mctx.arc(px(x), px(y), 2.6, 0, TAU); mctx.stroke();
-    mctx.fillStyle = c; mctx.fillRect(px(x) - .5, px(y) - .5, 1, 1);
+    mctx.beginPath(); mctx.arc(px(x), px(y), 3.4, 0, TAU); mctx.stroke();
+    mctx.fillStyle = c; mctx.fillRect(px(x) - 1, px(y) - 1, 2, 2);
   };
   /* a cross: something to break */
   const markCross = (x, y, c) => {
@@ -4016,7 +4016,6 @@ function drawMini() {
     mctx.fillStyle = c;
     mctx.beginPath(); mctx.moveTo(a, b - r); mctx.lineTo(a + r, b); mctx.lineTo(a, b + r); mctx.lineTo(a - r, b); mctx.fill();
   };
-  markRing(G.exit.x, G.exit.y, C.cyan);
   for (const n of G.nests) markCross(n.x, n.y, C.blood);
   for (const i of G.items) {
     if (i.kind === 'chest') markDiamond(i.x, i.y, C.amber);
@@ -4024,6 +4023,9 @@ function drawMini() {
     else if (i.kind === 'food') markBar(i.x, i.y, C.leaf);
     else if (i.kind === 'shrine') markDisc(i.x, i.y, shrineCol(i.sh));
   }
+  /* last, and over the top of everything: the way down is not one mark
+     among several, it is where the whole floor is going */
+  markRing(G.exit.x, G.exit.y, C.cyan);
   for (const P of G.players) { mctx.strokeStyle = 'rgba(235,228,210,.3)'; mctx.lineWidth = 1; mctx.beginPath(); mctx.arc(px(P.x), px(P.y), 7.5 * s, 0, TAU); mctx.stroke(); }
   /* and you are a square with a pale edge, so you are findable whatever
      delver you took and however you see colour */
