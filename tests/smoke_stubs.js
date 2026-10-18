@@ -11,7 +11,11 @@ function ctx2d() {
     createLinearGradient: () => grad,
     createPattern: () => grad,
     createImageData: (w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }),
-    getImageData: (x, y, w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }),
+    getImageData() {
+      throw new Error('the test stub does not rasterise: it would hand back ' +
+        'zeros whatever was drawn, so a pixel check here would pass on nothing. ' +
+        'Measure pixels in a browser instead.');
+    },
     measureText: () => ({ width: 10 }),
     drawImage() { drawCalls++; },
     setTransform() {}, save() {}, restore() {},
@@ -48,7 +52,14 @@ function el(id) {
     addEventListener() {}, removeEventListener() {}, appendChild(c) { this.children.push(c); return c; },
     focus() {}, blur() {}, setPointerCapture() {}, releasePointerCapture() {},
     getBoundingClientRect: () => ({ left: 0, top: 0, width: 960, height: 600, right: 960, bottom: 600 }),
-    querySelector: () => el('q'), querySelectorAll: () => [],
+    /* A stand-in, not a match. This stub builds a tree from createElement and
+       appendChild, but the UI also fills rows with `innerHTML = '<span
+       class="nm">...'`, which is a string here and never becomes children.
+       So a real matcher would return null and renderShop would throw on it.
+       The stand-in keeps that code running, and is marked so that nothing
+       mistakes writing into it for writing into the page. */
+    querySelector: () => { const q = el('q'); q.__standIn = true; return q; },
+    querySelectorAll: () => [],
     getContext: () => ctx2d(),
   };
   /* A real node's textContent is everything underneath it, and the UI here
@@ -78,7 +89,7 @@ globalThis.document = {
   getElementById: id => (nodes[id] || (nodes[id] = el(id))),
   createElement: tag => el(tag),
   querySelectorAll: () => [],
-  querySelector: () => el('q'),
+  querySelector: () => { const q = el('q'); q.__standIn = true; return q; },
   addEventListener() {},
 };
 globalThis.window = globalThis;

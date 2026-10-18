@@ -2154,6 +2154,11 @@ ok('not to the first', G.players[0].dmgMul === first0);
   /* 3. the band on the bar, drawn to scale */
   const pct = v => parseFloat(String(v).replace('%', ''));
   startGame(['ember']); G.level = 5; genLevel();
+  /* genLevel rolls an omen, and Still Air sets the drain to zero outright --
+     a floor that is "not hungry, only crowded". Leaving it to chance made
+     these checks measure a floor with no drain about a quarter of the time.
+     Pin it, and test Still Air deliberately below. */
+  G.omen = null;
   G.offer = null; G.offerQ.length = 0; G.state = 'play'; quiet();
   {
     const P = G.players[0]; P.hp = P.max; P.drainMul = 1; recalc(P); P.hp = P.max;
@@ -2186,6 +2191,23 @@ ok('not to the first', G.players[0].dmgMul === first0);
     ok('and it is not marked as worse', !hud1.drain.classList.contains('worse'),
        hud1.drain.classList.toString() || 'plain');
     P.perkDrain = 0; recalc(P);
+  }
+
+  /* 3b. and on a floor that is not draining anyone, it has nothing to say */
+  {
+    const P = G.players[0];
+    P.pacts.length = 0; P.perkDrain = 0; recalc(P); P.hp = P.max;
+    const still = OMENS.find(o => o.id === 'still');
+    ok('Still Air really does stop the drain', still && still.drain === 0,
+       still ? 'drain x' + still.drain : 'no such omen');
+    G.omen = still;
+    ok('and then the deep takes nothing at all', drainRate(P) === 0, String(drainRate(P)));
+    setHp(hud1, P);
+    ok('so the bar shows no band rather than an empty one', hud1.drain.hidden === true,
+       hud1.drain.hidden ? 'nothing shown' : 'drawn at ' + hud1.drain.style.width);
+    G.omen = null; setHp(hud1, P);
+    ok('and it comes back on an ordinary floor', hud1.drain.hidden === false,
+       hud1.drain.style.width);
   }
 
   /* 4. it must never run off either end of the bar */
@@ -2531,6 +2553,246 @@ ok('not to the first', G.players[0].dmgMul === first0);
     const none = [...$('oStats').children].map(r => r.textContent)
       .some(t => /took you|wore you down/.test(t));
     ok('and keeps quiet when a run cost nothing', !none);
+  }
+}
+
+/* ---------------- the stall between floors ---------------- */
+{
+  /* Ten upgrades with compounding prices, four caps and a five-state
+     machine, and the only thing anyone had ever checked was that the stall
+     turns up and does not throw while rendering. */
+  const shopOpen = (level, gold) => {
+    startGame(['sable']); G.level = level; genLevel();
+    G.offer = null; G.offerQ.length = 0; G.wares = [];
+    G.state = 'shop'; G.gold = gold;
+    return G.players[0];
+  };
+  const item = id => SHOP.find(s => s.id === id);
+
+  /* 1. the price compounds with each one you take, and with the depth */
+  {
+    const P = shopOpen(5, 99999), it = item('power');
+    const first = shopPrice(P, it);
+    shopBuy(P, 'power');
+    const second = shopPrice(P, it);
+    ok('a second Might costs more than the first', second > first, first + 'g -> ' + second + 'g');
+    ok('and by exactly the stated growth', second === Math.round((it.base + it.per * 5) * it.grow),
+       second + ' vs ' + Math.round((it.base + it.per * 5) * it.grow));
+    const shallow = shopPrice(P, item('ward'));
+    G.level = 15;
+    ok('and everything costs more the deeper you are', shopPrice(P, item('ward')) > shallow,
+       shallow + 'g at depth 5 -> ' + shopPrice(P, item('ward')) + 'g at 15');
+  }
+
+  /* 2. you pay what it says, and never go into debt */
+  {
+    const P = shopOpen(6, 400), it = item('swift');
+    const price = shopPrice(P, it), before = G.gold;
+    ok('buying deducts exactly the price shown', shopBuy(P, 'swift') && G.gold === before - price,
+       before + ' - ' + price + ' = ' + G.gold);
+    G.gold = 1;
+    const broke = shopBuy(P, 'power');
+    ok('and what you cannot afford you cannot buy', broke === false && G.gold === 1, 'gold ' + G.gold);
+    ok('the stall calls that being poor', shopState(P, item('power')) === 'poor', shopState(P, item('power')));
+  }
+
+  /* 3. the caps hold */
+  {
+    const P = shopOpen(4, 9999999), it = item('dash');
+    let bought = 0;
+    while (shopBuy(P, 'dash')) if (++bought > 50) break;
+    ok('a capped upgrade stops at its cap', bought === it.max, bought + ' of ' + it.max);
+    ok('and says so rather than going quiet', shopState(P, it) === 'max', shopState(P, it));
+  }
+
+  /* 4. healing is not sold to someone who does not need it */
+  {
+    const P = shopOpen(5, 9999); P.hp = P.max;
+    ok('no draught for a delver at full health', shopState(P, item('draught')) === 'full',
+       shopState(P, item('draught')));
+    P.hp = P.max * .4;
+    ok('but one for a delver who is hurt', shopState(P, item('draught')) === 'ok',
+       shopState(P, item('draught')));
+    const before = P.hp;
+    shopBuy(P, 'draught');
+    ok('and it restores half of them', Math.abs(P.hp - Math.min(P.max, before + P.max * .5)) < 1e-9,
+       before.toFixed(1) + ' -> ' + P.hp.toFixed(1));
+  }
+
+  /* 5. a downed delver buys nothing */
+  {
+    const P = shopOpen(5, 99999); P.down = true;
+    const states = SHOP.map(it => shopState(P, it));
+    ok('a fallen delver is sold nothing at all', states.every(s => s === 'down'),
+       [...new Set(states)].join(','));
+    ok('and cannot be made to buy', shopBuy(P, 'power') === false);
+    P.down = false;
+  }
+
+  /* 6. two delvers, one purse */
+  {
+    startGame(['bulwark', 'ember']); G.level = 6; genLevel();
+    G.offer = null; G.offerQ.length = 0; G.wares = []; G.state = 'shop'; G.gold = 100000;
+    const [A, B] = G.players;
+    shopBuy(A, 'power'); shopBuy(A, 'power');
+    ok('what one delver buys does not raise the price for the other',
+       shopPrice(B, item('power')) < shopPrice(A, item('power')),
+       'A pays ' + shopPrice(A, item('power')) + ', B pays ' + shopPrice(B, item('power')));
+    const purse = G.gold, cost = shopPrice(B, item('power'));
+    shopBuy(B, 'power');
+    ok('but they spend from the same purse', G.gold === purse - cost, purse + ' -> ' + G.gold);
+
+    /* the elixir is the one thing worth buying at full health */
+    A.hp = A.max; B.hp = 0; B.down = true;
+    ok('an elixir is sold at full health when a friend is down',
+       shopState(A, item('elixir')) === 'ok', shopState(A, item('elixir')));
+    shopBuy(A, 'elixir');
+    ok('and raises them', !B.down && B.hp > 0, B.down ? 'still down' : 'up with ' + Math.round(B.hp));
+    A.hp = A.max; B.hp = B.max; B.down = false;
+    ok('with nobody down it is not sold to the healthy',
+       shopState(A, item('elixir')) === 'full', shopState(A, item('elixir')));
+  }
+
+  /* 7. the upgrades actually do something */
+  {
+    const P = shopOpen(5, 9999999);
+    const before = { max: P.max, dmg: P.up.dmg, spd: P.up.spd, crit: P.up.crit };
+    shopBuy(P, 'vit'); shopBuy(P, 'power'); shopBuy(P, 'swift'); shopBuy(P, 'crit');
+    ok('Vitality raises the health it promises', P.max >= before.max + 25, before.max + ' -> ' + P.max);
+    ok('Might, Fleet Feet and Keen Edge all land',
+       P.up.dmg > before.dmg && P.up.spd > before.spd && P.up.crit > before.crit,
+       'dmg ' + P.up.dmg.toFixed(2) + ' spd ' + P.up.spd.toFixed(2) + ' crit ' + P.up.crit.toFixed(3));
+  }
+
+  /* 8. leaving the stall takes you down, and only from the stall */
+  {
+    const P = shopOpen(7, 0);
+    const was = G.level;
+    leaveShop();
+    ok('leaving the stall is how you descend', G.level === was + 1 && G.state === 'play',
+       'depth ' + G.level + ', ' + G.state);
+    const after = G.level;
+    leaveShop();
+    ok('and calling it again from the floor does nothing', G.level === after, 'depth ' + G.level);
+  }
+
+  /* 9. the gear stall */
+  {
+    const P = shopOpen(8, 100000);
+    rollWares();
+    ok('the stall lays out three things', G.wares.length === 3, String(G.wares.length));
+    ok('one of each kind', new Set(G.wares.map(w => w.slot)).size === 3,
+       G.wares.map(w => w.slot).join(','));
+    ok('each with a price', G.wares.every(w => w.price > 0), G.wares.map(w => w.price).join(','));
+    const w = G.wares[0], purse = G.gold;
+    ok('and a bought one is paid for and marked sold',
+       buyWare(P, 0) && G.wares[0].sold && G.gold === purse - w.price,
+       purse + ' -> ' + G.gold + ', sold ' + G.wares[0].sold);
+    ok('and cannot be bought twice', buyWare(P, 0) === false);
+  }
+
+  /* 10. what the stall would cost against what a run actually earns -- a cap
+         nobody can reach is a cap that is not really there */
+  {
+    const P = shopOpen(10, 0);
+    let full = 0;
+    for (const it of SHOP) {
+      const cap = it.id === 'master' ? 6 : (it.max || 1);
+      for (let n = 0; n < cap; n++) full += Math.round((it.base + it.per * 10) * Math.pow(it.grow, n));
+    }
+    ok('maxing every upgrade at depth ten is priced out of reach, by design',
+       full > 20000, full + ' gold for the lot');
+  }
+}
+
+/* ---------------- can the harness tell doing from not-doing ----------------
+   Three times running, the thing that nearly voided a check was this file's
+   own scaffolding rather than the game: a classList whose toggle did
+   nothing and whose contains always said no, a textContent that was a plain
+   string while the UI builds its rows out of child spans, and a chain
+   report read at a moment when the number had already been reset. Each one
+   made a check pass no matter what the code did, which is worse than having
+   no check, because it reads as evidence.
+
+   So: for every facility the suite leans on, prove it can distinguish the
+   code having acted from the code having done nothing. A stub that cannot
+   fail cannot test. */
+{
+  const node = () => document.createElement('div');
+
+  /* classes */
+  {
+    const e = node();
+    const blind = e.classList.contains('x');
+    e.classList.add('x');
+    const sees = e.classList.contains('x');
+    e.classList.toggle('x', false);
+    ok('[harness] a class that is set can be seen, and one that is not cannot',
+       !blind && sees && !e.classList.contains('x'));
+  }
+
+  /* text, composed from children as a real node does */
+  {
+    const row = node(), a = node(), b = node();
+    a.textContent = 'left'; b.textContent = 'right';
+    row.appendChild(a); row.appendChild(b);
+    ok('[harness] text reads through to the children', row.textContent === 'leftright', row.textContent);
+    const stale = row.textContent;
+    b.textContent = 'changed';
+    ok('[harness] and follows them when they change', row.textContent !== stale, row.textContent);
+    row.textContent = 'flat';
+    ok('[harness] setting it replaces them, as a browser does',
+       row.textContent === 'flat' && row.children.length === 0, row.textContent + ', ' + row.children.length);
+  }
+
+  /* emptying a list before refilling it */
+  {
+    const wrap = node();
+    wrap.appendChild(node()); wrap.appendChild(node());
+    const had = wrap.children.length;
+    wrap.innerHTML = '';
+    ok('[harness] clearing by innerHTML really empties it',
+       had === 2 && wrap.children.length === 0, had + ' -> ' + wrap.children.length);
+  }
+
+  /* hidden, which every overlay check in here turns on */
+  {
+    const e = node(); e.hidden = true;
+    const on = e.hidden; e.hidden = false;
+    ok('[harness] hidden is a property that holds what it is given', on === true && e.hidden === false);
+  }
+
+  /* storage, which the saved-run checks live on */
+  {
+    const k = 'hollowdeep-harness-probe';
+    localStorage.setItem(k, 'kept');
+    const back = localStorage.getItem(k);
+    localStorage.removeItem(k);
+    ok('[harness] storage keeps what it is given and gives it back',
+       back === 'kept' && localStorage.getItem(k) === null, String(back));
+  }
+
+  /* pixels: the stub does not rasterise, and must say so rather than hand
+     back a plausible array of zeros */
+  {
+    let refused = false, message = '';
+    try { ctx.getImageData(0, 0, 4, 4); } catch (e) { refused = true; message = String(e.message || ''); }
+    ok('[harness] it refuses to pretend it can read pixels', refused, message.slice(0, 60) || 'it answered');
+    ok('[harness] and says where to measure them instead', /browser/i.test(message), message.slice(0, 80));
+  }
+
+  /* selectors: it cannot match into content built from an innerHTML string,
+     so what comes back is a marked stand-in and nothing may be asserted
+     through it */
+  {
+    const row = node();
+    row.innerHTML = '<span class="nm"></span>';
+    const found = row.querySelector('.nm');
+    ok('[harness] a selector result is a marked stand-in, not a match',
+       !!found && found.__standIn === true, found ? 'marked ' + !!found.__standIn : 'null');
+    ok('[harness] so writing through one reaches nothing on the row',
+       (found.textContent = 'written', row.children.length === 0),
+       'row children ' + row.children.length);
   }
 }
 

@@ -4031,7 +4031,7 @@ function setHp(h, P) {
   if (h.drain) {
     const rate = drainRate(P), cost = Math.min(P.hp, rate * DRAIN_AHEAD);
     const lo = Math.max(0, (P.hp - cost) / P.max), hi = Math.max(lo, P.hp / P.max);
-    h.drain.hidden = P.down || P.hp <= 0;
+    h.drain.hidden = P.down || P.hp <= 0 || cost <= 0;
     h.drain.style.left = (lo * 100) + '%';
     h.drain.style.width = ((hi - lo) * 100) + '%';
     /* amber when something you took made it worse than the depth alone */
