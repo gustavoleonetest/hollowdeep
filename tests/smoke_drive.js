@@ -4,11 +4,16 @@ const report = [];
 const seen = new Set();
 const origErr = console.error;
 
+/* The chain report used to read G.comboBest once, at the very end, by which
+   time startGame had reset it -- so it always printed 0 and made a working
+   mechanic look dead. Watch it as it happens instead. */
+let peakChain = 0;
 function step(n, label) {
   for (let i = 0; i < n; i++) {
     try {
       readInput();
       update(1 / 60);
+      if (G.comboBest > peakChain) peakChain = G.comboBest;
       if (G.state === 'clear') clearTick(1 / 60);
       if (G.state === 'offer') { const o = G.offer; const n = o && o.kind === 'gear' ? 2 : o && o.kind === 'pact' ? 2 : (o && o.opts ? o.opts.length : 3); applyUpgrade(Math.floor(Math.random() * n)); }
       if (G.state === 'shop') { renderShop(); leaveShop(); }
@@ -93,5 +98,5 @@ step(20, 'menu'); nFrames += 20;
 
 console.log('nFrames stepped:', nFrames);
 console.log('draw calls:', __drawCalls());
-console.log('best chain reached:', G.comboBest);
+console.log('best chain reached:', peakChain);
 console.log(report.length ? 'ERRORS:\n' + report.join('\n') : 'NO RUNTIME ERRORS');
