@@ -291,6 +291,7 @@ function saveRun() {
     localStorage.setItem(RUN_KEY, JSON.stringify({
       v: 1, cls: G.clsKeys, level: G.level, score: G.score, gold: G.gold,
       bombs: G.bombs, kills: G.kills, drops: G.drops, runT: G.runT, comboBest: G.comboBest, won: !!G.won,
+      tollDeep: G.tollDeep, tollFoes: G.tollFoes,
       /* no key and no fallen: the floor that is about to be built hands out
          its own key and sets anyone down back on their feet */
       ps: G.players.map(P => ({
@@ -320,7 +321,9 @@ function loadRun() {
     cls: cls.slice(), level: lvl, score: metaNum(raw.score, 0, 0), gold: metaNum(raw.gold, 0, 0),
     bombs: metaNum(raw.bombs, 0, 0), kills: metaNum(raw.kills, 0, 0),
     drops: metaNum(raw.drops, 0, 0), runT: Math.max(0, num(raw.runT, 0)),
-    comboBest: metaNum(raw.comboBest, 0, 0), won: !!raw.won, ps: []
+    comboBest: metaNum(raw.comboBest, 0, 0), won: !!raw.won,
+    /* absent in a save written before this existed, which is simply zero */
+    tollDeep: Math.max(0, num(raw.tollDeep, 0)), tollFoes: Math.max(0, num(raw.tollFoes, 0)), ps: []
   };
   for (const p of ps) {
     if (!p || typeof p !== 'object') { clearRun(); return null; }
@@ -355,6 +358,7 @@ function resumeRun(r) {
   G.player = G.players[0];
   G.gold = r.gold; G.bombs = r.bombs; G.kills = r.kills; G.drops = r.drops;
   G.runT = r.runT; G.comboBest = r.comboBest; G.score = r.score; G.won = r.won;
+  G.tollDeep = r.tollDeep; G.tollFoes = r.tollFoes;
   G.combo = 0; G.comboT = 0; G.earned = 0; G.zones = []; G.timers = []; G.bolts = [];
   G.voice = null; G.flash = 0; G.offer = null; G.offerQ = []; G.wares = []; G.winPending = false;
   G.level = r.level; genLevel(); G.state = 'play'; G.paused = false;
@@ -567,6 +571,14 @@ function rollOmen(depth) {
   return OMENS[rint(0, OMENS.length - 1)];
 }
 const om = (k, dflt) => (G.omen && G.omen[k] !== undefined) ? G.omen[k] : dflt;
+/* What a delver actually lost, and to what. Counted against the health they
+   had rather than the blow that was thrown, so the killing hit adds what it
+   really took and not the overkill on top. */
+function toll(which, was, P) {
+  const lost = Math.max(0, was - Math.max(0, P.hp));
+  if (which === 'deep') G.tollDeep = (G.tollDeep || 0) + lost;
+  else G.tollFoes = (G.tollFoes || 0) + lost;
+}
 /* The drain, in one place, because the health bar draws this number and the
    floor takes it: two copies would be two answers.
    drainPlain is what the depth alone asks. Everything past it -- the omen,
@@ -1335,6 +1347,7 @@ function startGame(list) {
   G.clsKeys = list; G.clsKey = list[0]; G.co = list.length > 1;
   G.players = list.map((k, i) => makeDelver(k, i));
   G.player = G.players[0]; G.gold = 0; G.keys = 0; G.combo = 0; G.comboT = 0; G.comboBest = 0;
+  G.tollDeep = 0; G.tollFoes = 0;
   G.bombs = 1 + perkLv('flask'); G.drops = 0; G.kills = 0; G.runT = 0; G.earned = 0; G.zones = []; G.timers = []; G.bolts = []; G.voice = null; G.flash = 0; G.offer = null; G.offerQ = []; G.wares = [];
   G.level = 1; G.score = 0; G.won = false; G.winPending = false; genLevel(); G.state = 'play'; G.paused = false;
 }
@@ -1386,7 +1399,9 @@ function downPlayer(P) {
 function hurtPlayer(P, dmg, ang, src) {
   if (P.down || P.inv > 0 || G.state !== 'play') return;
   const d = Math.max(1, Math.round(dmg * P.cls.armor * P.armMul * (P.shield > 0 ? .3 : 1)));
-  P.hp -= d; P.inv = .55; P.hurt = .25; P.lastHit = clock; G.shake = Math.max(G.shake, .3);
+  const wasHp = P.hp;
+  P.hp -= d; toll('foes', wasHp, P);
+  P.inv = .55; P.hurt = .25; P.lastHit = clock; G.shake = Math.max(G.shake, .3);
   if (bn(P, 'riposte')) { P.cd = 0; P.nextCrit = true; burst(P.x, P.y, '#fff1b8', 10, 150, .8, 'spark'); }
   if (G.combo > 0) { G.combo = Math.floor(G.combo * .5); if (G.combo <= 0) G.comboT = 0; }
   moveEnt(P, Math.cos(ang) * -6, Math.sin(ang) * -6);
@@ -1815,7 +1830,8 @@ function updatePlayer(P, I, dt) {
   P.chill = Math.max(0, P.chill - dt);
   if (I.bomb) useBomb(P);
   /* the dungeon itself is draining you; food is the only clock that matters */
-  P.hp -= drainRate(P) * dt;
+  const wasDrain = P.hp;
+  P.hp -= drainRate(P) * dt; toll('deep', wasDrain, P);
   /* only once it has actually cost something, and only when nothing is
      hitting you, so the lesson is unmistakably about the drain */
   if (P.hp < P.max * .92 && clock - (P.lastHit || 0) > 3.5) teach('drain');
@@ -2144,7 +2160,9 @@ function updateEnemies(dt) {
       for (const p of alive) {
         if (Math.hypot(p.x - e.x, p.y - e.y) >= e.r + p.r + 6) continue;
         const bite = (22 + G.level * 2) * dt;
-        p.hp -= bite; e.fed = (e.fed || 0) + bite; p.hurt = Math.max(p.hurt, .12);
+        const wasBite = p.hp;
+        p.hp -= bite; toll('foes', wasBite, p);
+        e.fed = (e.fed || 0) + bite; p.hurt = Math.max(p.hurt, .12);
         if (Math.random() < .5) G.parts.push({ x: p.x + rnd(-8, 8), y: p.y + rnd(-8, 4), vx: (e.x - p.x) * .02, vy: (e.y - p.y) * .02, life: .45, max: .45, col: '#dfe4ef', s: 2.4 });
         announceOnce('death', 6, p.cls.name + ' is being devoured', '#dfe4ef');
         if (p.hp <= 0) downPlayer(p);
@@ -4219,6 +4237,15 @@ function showOver() {
     ['Gold carried', String(G.gold)],
     ['Time below', mmss(G.runT || 0)]
   ];
+  /* the one row that answers "what went wrong" */
+  {
+    const deep = Math.round(G.tollDeep || 0), foes = Math.round(G.tollFoes || 0), all = deep + foes;
+    if (all > 0) {
+      const pc = n => Math.round(n / all * 100);
+      rows.splice(3, 0, [won || G.won ? 'What wore you down' : 'What took you',
+        'the deep ' + deep + '  (' + pc(deep) + '%)  \u00b7  its creatures ' + foes + '  (' + pc(foes) + '%)']);
+    }
+  }
   if (G.won) rows.unshift([HEART_NAME, 'put down at depth ' + FINAL_DEPTH + '  \u00b7  ' + (META.wins || 1) + (META.wins === 1 ? ' time' : ' times') + ' in all']);
   const allPacts = [];
   for (const p of G.players) for (const q of (p.pacts || [])) allPacts.push(q.name);
