@@ -4355,8 +4355,45 @@ function showOver() {
   (G.state === 'won' ? $('deeper') : $('again')).focus({ preventScroll: true });
 }
 /* ---------- the Barrow: spend what the last run left ---------- */
+/* Each zone holds three depths and its warden stands on the last of them,
+   so zone i runs from 3i+1 to 3i+3. You cannot reach 3i+4 without having
+   put that warden down, which is what makes one number enough. */
+function renderDeep() {
+  const wrap = $('deepRows'); if (!wrap) return;
+  wrap.innerHTML = '';
+  const deepest = META.deepest || 1, wins = META.wins || 0;
+  const row = (col, name, blurb, right, dim) => {
+    const r = document.createElement('div'); r.className = 'srow'; r.style.setProperty('--c', col);
+    if (dim) r.style.opacity = '.55';
+    const info = document.createElement('div');
+    const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = name; info.appendChild(nm);
+    const bl = document.createElement('span'); bl.className = 'bl'; bl.textContent = blurb; info.appendChild(bl);
+    r.appendChild(info);
+    const bw = document.createElement('div'); bw.className = 'sbuy';
+    const s = document.createElement('span'); s.className = 'bl'; s.textContent = right; bw.appendChild(s);
+    r.appendChild(bw); wrap.appendChild(r);
+  };
+  for (let i = 0; i < ZONES.length; i++) {
+    const z = ZONES[i], first = 3 * i + 1, last = 3 * i + 3;
+    const seen = deepest >= first, felled = deepest >= last + 1;
+    row(seen ? z.amb : '#454c5e',
+        'Depths ' + first + '\u2013' + last + (seen ? '  \u00b7  ' + z.name : ''),
+        seen ? z.boss + ' guards the key at depth ' + last + '.' : 'You have not been this deep.',
+        felled ? 'Felled' : seen ? 'Still standing' : '\u2014',
+        !seen);
+  }
+  const won = wins > 0;
+  row(won ? '#ffd24a' : '#454c5e',
+      'Depth ' + FINAL_DEPTH + '  \u00b7  The Hollow',
+      won ? HEART_NAME + ' has been put down.'
+          : deepest >= FINAL_DEPTH ? HEART_NAME + ' is still beating.'
+          : HEART_NAME + ' waits at the bottom.',
+      won ? 'Taken ' + wins + (wins === 1 ? ' time' : ' times') : '\u2014',
+      !won);
+}
 function renderBarrow() {
-  $('barrowSub').textContent = 'You have ' + META.echoes + ' echoes. ' + (META.runs || 0) + ' descent' + (META.runs === 1 ? '' : 's') + ', deepest reach ' + (META.deepest || 1) + '.';
+  $('barrowSub').textContent = 'You have ' + META.echoes + ' echoes. ' + (META.runs || 0) + ' descent' + (META.runs === 1 ? '' : 's') + ', deepest reach ' + (META.deepest || 1) + ' of ' + FINAL_DEPTH + '.';
+  renderDeep();
   const wrap = $('barrowRows'); wrap.innerHTML = '';
   for (const p of PERKS) {
     const lv = perkLv(p.id), maxed = lv >= p.max, cost = perkCost(p);
@@ -4374,7 +4411,13 @@ function renderBarrow() {
     bw.appendChild(b); row.appendChild(bw); wrap.appendChild(row);
   }
 }
-function showBarrow(on) { $('barrow').hidden = !on; if (on) { renderBarrow(); $('barrowBack').focus({ preventScroll: true }); } }
+function showBarrow(on) {
+  $('barrow').hidden = !on;
+  /* the menu is behind it and shows through, so it waits outside */
+  $('menu').hidden = !!on;
+  if (on) { renderBarrow(); $('barrowBack').focus({ preventScroll: true }); }
+  else { $('barrow').scrollTop = 0; }
+}
 let lootShown = false, pauseShown = false;
 /* What you are carrying, and what it has made of you. */
 function showPaused() {

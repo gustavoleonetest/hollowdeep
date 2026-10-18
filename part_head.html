@@ -112,6 +112,7 @@ body{
 @media (max-width:520px){.srow{grid-template-columns:1fr}.sbuy{justify-content:flex-start}}
 @media (max-width:520px){.bar h1{font-size:26px}.sheet h2{font-size:30px}}
 .phoneonly{display:none}
+.subhead{color:var(--bone); letter-spacing:.04em; text-transform:uppercase; font-size:13px; margin-top:4px}
 .sheet .nosave{color:#f0a23c; border-left:3px solid #f0a23c; padding-left:10px}
 /* losing a set is the one thing a stat-by-stat comparison cannot show you:
    the new item can be better on every line and still be a downgrade */
@@ -226,6 +227,8 @@ body{
       <h2>The Barrow</h2>
       <p class="sub" id="barrowSub"></p>
       <div class="srows" id="barrowRows"></div>
+      <p class="sub subhead">How deep it goes</p>
+      <div class="srows" id="deepRows"></div>
       <div class="row"><button class="btn" id="barrowBack" type="button">Back</button></div>
     </div>
   </div>
