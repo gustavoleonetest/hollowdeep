@@ -3008,6 +3008,232 @@ ok('not to the first', G.players[0].dmgMul === first0);
   }
 }
 
+/* ---------------- every number an item promises ----------------
+   An item advertises a stat by having a line in STAT_LABEL. Nothing
+   connected that list to the code that makes the stat do something, so a
+   stat could be added, printed on the card, and never wired up -- a promise
+   in writing that the dungeon does not keep. Worse than a missing feature,
+   because the player is told otherwise.
+
+   The list below is checked against STAT_LABEL itself, so a new label with
+   no probe behind it fails here rather than shipping as a lie. */
+{
+  const bare = () => {
+    startGame(['sable']); G.level = 5; genLevel();
+    G.offer = null; G.offerQ.length = 0; G.state = 'play';
+    G.enemies.length = 0; G.nests.length = 0; G.items.length = 0; G.hazards.length = 0;
+    G.omen = null;
+    const P = G.players[0];
+    P.gear.weapon = P.gear.armour = P.gear.trinket = null;
+    P.pacts.length = 0; P.perkGold = 0; P.perkDrain = 0;
+    recalc(P); P.hp = P.max; P.inv = 0;
+    return P;
+  };
+  const wear = (P, stat, v) => {
+    P.gear.trinket = { slot: 'trinket', base: 'Sigil', rar: 'magic', col: '#6fa8ff',
+                       name: 'Probe', s: { [stat]: v }, ilvl: 1, set: null, setName: null };
+    recalc(P); P.hp = P.max; P.inv = 0;
+    return P;
+  };
+
+  /* each probe: set the stat high, measure one observable, say which way it
+     should move. Measured through the game's own code, never by reading the
+     stat back out of the bag it was just put into. */
+  const PROBES = {
+    dmg:    { v: .5,  want: 'up',   m: P => P.dmgMul },
+    cd:     { v: -.4, want: 'down', m: P => P.cdMul },
+    crit:   { v: .3,  want: 'up',   m: P => P.crit },
+    spd:    { v: .3,  want: 'up',   m: P => P.spdMul },
+    hp:     { v: 60,  want: 'up',   m: P => P.max },
+    dash:   { v: -.4, want: 'down', m: P => P.dashMul },
+    drain:  { v: .6,  want: 'up',   m: P => drainRate(P) },
+    arm:    { v: .5,  want: 'down', m: P => {
+      P.hp = P.max; P.inv = 0; const before = P.hp;
+      hurtPlayer(P, 60, 0);
+      return before - P.hp;                       /* health actually lost */
+    } },
+    leech:  { v: .5,  want: 'up',   m: P => {
+      P.hp = P.max * .5;
+      spawnFoe('gloam', P.x + 40, P.y, false);   /* NOT elite: a ward blocks
+        the blow outright and there is nothing to drain from a blocked hit */
+      const e = G.enemies[G.enemies.length - 1], before = P.hp;
+      hurtFoe(e, 30, 0, false, false, P);
+      const gained = P.hp - before;
+      G.enemies.length = 0;
+      return gained;                              /* health drawn back */
+    } },
+    thorns: { v: .8,  want: 'up',   m: P => {
+      spawnFoe('brute', P.x + 30, P.y, false);   /* likewise ordinary */
+      const e = G.enemies[G.enemies.length - 1], before = e.hp;
+      P.hp = P.max; P.inv = 0;
+      hurtPlayer(P, 40, 0, e);
+      const dealt = before - e.hp;
+      G.enemies.length = 0;
+      return dealt;                               /* damage returned */
+    } },
+    gold:   { v: 1,   want: 'up',   m: P => {
+      G.gold = 0; G.items.length = 0;
+      G.items.push({ kind: 'gold', x: P.x, y: P.y, t: 0, v: 100 });
+      update(1 / 60);
+      const got = G.gold;
+      G.items.length = 0;
+      return got;                                 /* coin actually banked */
+    } },
+    sp:     { v: 3,   want: 'down', m: P => {
+      P.spCd = 0; G.state = 'play'; special(P);
+      return P.spMax;                             /* seconds until the next */
+    } },
+  };
+
+  /* (a) the list cannot fall behind what an item may advertise */
+  {
+    const labelled = Object.keys(STAT_LABEL);
+    const unprobed = labelled.filter(k => !PROBES[k]);
+    const extra = Object.keys(PROBES).filter(k => !STAT_LABEL[k]);
+    ok('every stat an item can advertise is probed here', unprobed.length === 0,
+       unprobed.join(',') || labelled.length + ' stats');
+    ok('and nothing is probed that no item can advertise', extra.length === 0, extra.join(','));
+  }
+
+  /* (b) each one actually does something, in the right direction */
+  {
+    const dead = [], backwards = [];
+    for (const k in PROBES) {
+      const pr = PROBES[k];
+      const without = pr.m(bare());
+      const withIt = pr.m(wear(bare(), k, pr.v));
+      const moved = Math.abs(withIt - without) > 1e-6;
+      if (!moved) { dead.push(k + ' (' + without + ')'); continue; }
+      const right = pr.want === 'up' ? withIt > without : withIt < without;
+      if (!right) backwards.push(k + ': ' + without.toFixed(3) + ' -> ' + withIt.toFixed(3));
+    }
+    ok('every advertised stat changes something', dead.length === 0,
+       dead.join('; ') || Object.keys(PROBES).length + ' stats, all live');
+    ok('and changes it the way the card says', backwards.length === 0,
+       backwards.join('; ') || 'all in the promised direction');
+  }
+
+  /* (b2) and the interaction that made the probe wrong in the first place */
+  {
+    const P = wear(bare(), 'leech', .5);
+    P.hp = P.max * .5;
+    spawnFoe('gloam', P.x + 40, P.y, true);
+    const e = G.enemies[G.enemies.length - 1];
+    e.eaff = ['warded']; e.wardMax = e.max * .45; e.ward = e.wardMax;
+    const hadHp = P.hp, hadFoe = e.hp, hadWard = e.ward;
+    hurtFoe(e, 20, 0, false, false, P);
+    ok('a ward takes the blow instead of the foe', e.ward < hadWard && e.hp === hadFoe,
+       'ward ' + hadWard.toFixed(1) + ' -> ' + e.ward.toFixed(1) + ', hp unchanged ' + (e.hp === hadFoe));
+    ok('and there is nothing to drain from a blocked hit', P.hp === hadHp,
+       hadHp.toFixed(1) + ' -> ' + P.hp.toFixed(1));
+    /* once the ward is gone the blow lands and the leech follows */
+    e.ward = 0;
+    const nowHp = P.hp;
+    hurtFoe(e, 20, 0, false, false, P);
+    ok('once it is down, the blow lands and the leech follows', P.hp > nowHp && e.hp < hadFoe,
+       'drew ' + (P.hp - nowHp).toFixed(1) + ' back');
+    G.enemies.length = 0;
+  }
+
+  /* (c) the two that are easiest to get backwards, stated outright */
+  {
+    const plain = bare(), before = plain.cdMul;
+    const fast = wear(bare(), 'cd', -.4);
+    ok('"attacks faster" means a shorter wait, not a longer one', fast.cdMul < before,
+       before.toFixed(3) + ' -> ' + fast.cdMul.toFixed(3));
+    const soft = wear(bare(), 'arm', .5);
+    soft.hp = soft.max; soft.inv = 0; const hadS = soft.hp; hurtPlayer(soft, 60, 0);
+    const tough = hadS - soft.hp;
+    const naked = bare(); naked.hp = naked.max; naked.inv = 0;
+    const hadN = naked.hp; hurtPlayer(naked, 60, 0);
+    const soft2 = hadN - naked.hp;
+    ok('"less damage taken" means less of it arrives', tough < soft2,
+       soft2.toFixed(1) + ' without -> ' + tough.toFixed(1) + ' with');
+  }
+}
+
+/* ---------------- nothing runs away with itself ----------------
+   This game once shipped a damage multiplier of two hundred and thirty
+   million, from an upgrade that multiplied where it should have added. The
+   clamps in recalc are the scar tissue from that, and scar tissue is worth
+   a test: a bound nobody checks is a bound that quietly stops holding. */
+{
+  const everything = () => {
+    startGame(['bulwark']); G.level = 21; genLevel();
+    G.offer = null; G.offerQ.length = 0; G.state = 'play';
+    G.enemies.length = 0; G.items.length = 0; G.omen = null;
+    const P = G.players[0];
+    /* the most extravagant thing the dungeon can actually hand someone:
+       three fabled pieces, every pact, and a full set on top */
+    for (const slot of SLOTS) {
+      P.gear[slot] = { slot, base: 'Greed', rar: 'fabled', col: '#e08a3c', name: 'Absurd ' + slot,
+        s: { dmg: .9, arm: .9, hp: 400, crit: .9, spd: .9, cd: -.9, dash: -.9,
+             leech: .9, thorns: .9, gold: .9, sp: 9, drain: -.9 },
+        ilvl: 21, set: 'quick', setName: 'The Quickened' };
+    }
+    P.pacts.length = 0;
+    for (const q of PACTS) P.pacts.push(q);
+    /* and every shop upgrade bought to its cap */
+    for (const it of SHOP) {
+      const cap = it.id === 'master' ? 6 : (it.max || 1);
+      for (let n = 0; n < cap; n++) { P.buys = P.buys || {}; P.buys[it.id] = n + 1; if (it.id !== 'draught' && it.id !== 'elixir') applyUp(P, it.id, 1); }
+    }
+    recalc(P);
+    return P;
+  };
+
+  const P = everything();
+  const bounds = [
+    ['move speed', P.spdMul, .4, 1.95],
+    ['armour', P.armMul, .32, 2.2],
+    ['dash', P.dashMul, .35, 2.4],
+    ['attack speed', P.cdMul, .3, Infinity],
+    ['critical chance', P.crit, 0, .75],
+    ['the drain', P.drainMul, .3, Infinity],
+  ];
+  const escaped = bounds.filter(([, v, lo, hi]) => !(v >= lo - 1e-9 && v <= hi + 1e-9));
+  ok('no multiplier escapes its clamp, however much is piled on',
+     escaped.length === 0,
+     escaped.map(([n, v]) => n + ' = ' + v).join('; ') ||
+       bounds.map(([n, v]) => n + ' ' + (+v).toFixed(2)).join(', '));
+
+  ok('every one of them is still a number', bounds.every(([, v]) => Number.isFinite(v)),
+     bounds.map(([n, v]) => n + ' ' + v).join(', '));
+
+  /* damage is deliberately not clamped -- it is the one that is supposed to
+     grow -- so the guard is that it stays somewhere a human could reach */
+  ok('damage grows without running away', Number.isFinite(P.dmgMul) && P.dmgMul > 1 && P.dmgMul < 500,
+     'x' + P.dmgMul.toFixed(1));
+  ok('and health stays a sane whole number',
+     Number.isFinite(P.max) && P.max > 0 && P.max === Math.round(P.max) && P.max < 100000,
+     String(P.max));
+
+  /* and the delver is still playable with all of it on */
+  {
+    let err = null;
+    try { for (let i = 0; i < 300; i++) update(1 / 60); } catch (e) { err = e; }
+    ok('and a delver wearing the lot survives five seconds of play',
+       err === null && Number.isFinite(G.players[0].hp),
+       err ? String(err.message) : 'hp ' + Math.round(G.players[0].hp));
+  }
+
+  /* the specific shape of the old bug: an upgrade bought many times must
+     add, not compound */
+  {
+    startGame(['ember']); G.level = 3; genLevel();
+    G.offer = null; G.offerQ.length = 0; G.state = 'play';
+    const Q = G.players[0], first = Q.up.dmg;
+    applyUp(Q, 'power', 1); recalc(Q); const one = Q.up.dmg;
+    for (let i = 0; i < 5; i++) { applyUp(Q, 'power', 1); }
+    recalc(Q);
+    const six = Q.up.dmg;
+    const step = one - first;
+    ok('buying Might six times adds six steps rather than compounding',
+       Math.abs((six - first) - 6 * step) < 1e-9,
+       'one step ' + step.toFixed(3) + ', six gave ' + (six - first).toFixed(3));
+  }
+}
+
 const fails = results.filter(r => r[0] === 'FAIL');
 for (const [st, n, x] of results) console.log(st + '  ' + n + (x ? '  [' + x + ']' : ''));
 console.log('\n' + (results.length - fails.length) + '/' + results.length + ' checks passed');
