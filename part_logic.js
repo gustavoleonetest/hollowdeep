@@ -464,6 +464,21 @@ const SETS = [
   { id: 'quick', name: 'The Quickened', s2: { spd: .11, cd: -.1 } }
 ];
 const BASE_STAT = { weapon: 'dmg', armour: 'arm', trinket: 'crit' };
+/* How many pieces of a set a delver has on. `exceptSlot` leaves one slot
+   out, because equipping something REPLACES what is in that slot rather
+   than adding to it -- counting the worn piece as well would promise a
+   pair that taking the new item would actually break. */
+function setWorn(P, id, exceptSlot) {
+  let n = 0;
+  if (!id || !P || !P.gear) return 0;
+  for (const slot of SLOTS) {
+    if (slot === exceptSlot) continue;
+    const g = P.gear[slot];
+    if (g && g.set === id) n++;
+  }
+  return n;
+}
+const setLive = (P, id) => !!id && (P.sets || []).some(s => s.id === id);
 function rollRarity(bonus) {
   const r = Math.random() * 100 - (bonus || 0) - G.level * 1.1;
   return r < 9 ? RARITY.fabled : r < 33 ? RARITY.rare : RARITY.magic;
@@ -527,13 +542,21 @@ const STAT_LABEL = {
   elem: v => ({ fire: 'Fire damage: burns, and skeletons fear it', cold: 'Cold damage: chills, and hounds fear it', shock: 'Lightning damage: arcs, and wisps fear it', poison: 'Poison damage: rots, and brutes fear it' })[v],
   elemDmg: () => null
 };
-function itemLines(it) {
+function itemLines(it, P) {
   const out = [];
   for (const k of ['dmg', 'arm', 'hp', 'crit', 'spd', 'cd', 'dash', 'sp', 'leech', 'thorns', 'gold', 'drain', 'elem']) {
     if (it.s[k] === undefined || it.s[k] === 0) continue;
     const t = STAT_LABEL[k] && STAT_LABEL[k](it.s[k]); if (t) out.push(t);
   }
-  if (it.setName) out.push('Set: ' + it.setName + ' (2 pieces grant more)');
+  if (it.setName) {
+    /* with a delver to ask, say what taking this would actually do */
+    if (P) {
+      const would = setWorn(P, it.set, it.slot) + 1;
+      out.push('Set: ' + it.setName + (would >= 3 ? ' \u2014 all three together'
+        : would === 2 ? ' \u2014 a pair with what else you wear'
+        : ' \u2014 no other piece of it yet'));
+    } else out.push('Set: ' + it.setName + ' (2 pieces grant more)');
+  }
   return out;
 }
 
@@ -1274,7 +1297,7 @@ function recalc(P) {
     if (setN[id] < 2) continue;
     const S = SETS.find(x => x.id === id); if (!S) continue;
     const mult = setN[id] >= 3 ? 2 : 1;
-    P.sets.push({ name: S.name, n: setN[id] });
+    P.sets.push({ id, name: S.name, n: setN[id] });
     for (const k in S.s2) addStat(g, k, S.s2[k] * mult);
   }
   P.g = g;
@@ -4047,7 +4070,10 @@ function setHp(h, P) {
     sp.style.borderColor = it ? it.col : '#2d3548';
     sp.style.borderStyle = it ? ({ magic: 'solid', rare: 'dashed', fabled: 'double', cursed: 'dotted' }[it.rar] || 'solid') : 'solid';
     sp.style.borderWidth = it && it.rar === 'fabled' ? '3px' : '1px';
-    sp.title = it ? it.name + ' \u2014 ' + itemLines(it).join(', ') : 'No ' + sp.dataset.s;
+    /* underlined means this piece is holding up a set that is live: a
+       typographic mark, so it does not lean on colour */
+    sp.style.textDecoration = it && setLive(P, it.set) ? 'underline' : 'none';
+    sp.title = it ? it.name + ' \u2014 ' + itemLines(it, P).join(', ') : 'No ' + sp.dataset.s;
   }
   h.dash.style.width = (100 - clamp(P.dashCd / (1.3 * P.dashMul), 0, 1) * 100) + '%';
   h.sp.style.width = (100 - clamp(P.spCd / (P.spMax || SP_CD), 0, 1) * 100) + '%'; h.sp.style.background = P.spCd <= 0 ? P.cls.col : '';
@@ -4299,18 +4325,27 @@ function showBarrow(on) { $('barrow').hidden = !on; if (on) { renderBarrow(); $(
 let lootShown = false;
 function sheetLine(P) {
   const pct = x => Math.round((x - 1) * 100);
-  return P.cls.name + ' \u00b7 level ' + P.plvl + ' \u00b7 ' + P.max + ' max health, damage +' + pct(P.dmgMul) + '%, speed +' + pct(P.spdMul) + '%, attacks ' + pct(1 / P.cdMul) + '% faster.';
+  let line = P.cls.name + ' \u00b7 level ' + P.plvl + ' \u00b7 ' + P.max + ' max health, damage +' + pct(P.dmgMul) + '%, speed +' + pct(P.spdMul) + '%, attacks ' + pct(1 / P.cdMul) + '% faster.';
+  if (P.sets && P.sets.length) {
+    line += ' Wearing ' + P.sets.map(s => s.name + (s.n >= 3 ? ' in full' : '')).join(' and ') + '.';
+  }
+  return line;
 }
-function gearCard(label, item, idx, hint) {
+function gearCard(label, item, idx, hint, who, breaks) {
   const b = document.createElement('button'); b.type = 'button'; b.className = 'card';
   b.style.setProperty('--c', item ? item.col : '#3a4152');
   const r = document.createElement('span'); r.className = 'itemrar'; r.style.color = item ? item.col : '#98a0b3';
   r.textContent = label; b.appendChild(r);
   const n = document.createElement('span'); n.className = 'nm'; n.textContent = item ? item.name : 'Nothing worn'; b.appendChild(n);
   const s = document.createElement('span'); s.className = 'itemstats';
-  if (item) for (const line of itemLines(item)) { const d = document.createElement('span'); d.textContent = line; s.appendChild(d); }
+  if (item) for (const line of itemLines(item, who)) { const d = document.createElement('span'); d.textContent = line; s.appendChild(d); }
   else { const d = document.createElement('span'); d.textContent = 'That slot is empty.'; s.appendChild(d); }
   b.appendChild(s);
+  if (breaks) {
+    const w = document.createElement('span'); w.className = 'setwarn';
+    w.textContent = 'Taking this breaks ' + breaks;
+    b.appendChild(w);
+  }
   const h = document.createElement('span'); h.className = 'rare'; h.textContent = hint; b.appendChild(h);
   b.addEventListener('click', () => chooseUp(idx));
   return b;
@@ -4321,8 +4356,15 @@ function showLoot() {
     $('lootT').textContent = (G.co ? 'P' + (P.idx + 1) + ' finds ' : 'You find ') + o.item.name;
     $('lootS').textContent = sheetLine(P);
     $('lootHint').textContent = 'Press 1 to equip, 2 to leave it.';
-    wrap.appendChild(gearCard('New \u00b7 ' + (RARITY[o.item.rar] || {}).name, o.item, 0, '1 \u00b7 Equip'));
-    wrap.appendChild(gearCard('Worn \u00b7 ' + o.item.slot, o.cur, 1, '2 \u00b7 Keep this'));
+    /* the set the worn piece is holding up, if swapping it would drop the
+       count back under two */
+    let breaks = null;
+    if (o.cur && o.cur.set && setLive(P, o.cur.set) && setWorn(P, o.cur.set, o.cur.slot) + (o.item.set === o.cur.set ? 1 : 0) < 2) {
+      const S = SETS.find(x => x.id === o.cur.set);
+      breaks = S ? S.name : null;
+    }
+    wrap.appendChild(gearCard('New \u00b7 ' + (RARITY[o.item.rar] || {}).name, o.item, 0, '1 \u00b7 Equip', P, breaks));
+    wrap.appendChild(gearCard('Worn \u00b7 ' + o.item.slot, o.cur, 1, '2 \u00b7 Keep this', P, null));
   } else if (o.kind === 'pact') {
     const sh = o.shrine.sh, p = sh.pact, mys = sh.kind === 'mystery', col = shrineCol(sh);
     $('lootT').textContent = (G.co ? 'P' + (P.idx + 1) + ': ' : '') + (mys ? 'An altar you cannot read' : isPact(p) ? 'The altar wants something back' : 'A font burns clean');
