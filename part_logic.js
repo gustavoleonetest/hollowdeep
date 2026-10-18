@@ -358,7 +358,7 @@ function resumeRun(r) {
   G.player = G.players[0];
   G.gold = r.gold; G.bombs = r.bombs; G.kills = r.kills; G.drops = r.drops;
   G.runT = r.runT; G.comboBest = r.comboBest; G.score = r.score; G.won = r.won;
-  G.tollDeep = r.tollDeep; G.tollFoes = r.tollFoes;
+  G.tollDeep = r.tollDeep; G.tollFoes = r.tollFoes; G.gaveUp = false;
   G.combo = 0; G.comboT = 0; G.earned = 0; G.zones = []; G.timers = []; G.bolts = [];
   G.voice = null; G.flash = 0; G.offer = null; G.offerQ = []; G.wares = []; G.winPending = false;
   G.level = r.level; genLevel(); G.state = 'play'; G.paused = false;
@@ -1403,7 +1403,7 @@ function startGame(list) {
   G.player = G.players[0]; G.gold = 0; G.keys = 0; G.combo = 0; G.comboT = 0; G.comboBest = 0;
   G.tollDeep = 0; G.tollFoes = 0;
   G.bombs = 1 + perkLv('flask'); G.drops = 0; G.kills = 0; G.runT = 0; G.earned = 0; G.zones = []; G.timers = []; G.bolts = []; G.voice = null; G.flash = 0; G.offer = null; G.offerQ = []; G.wares = [];
-  G.level = 1; G.score = 0; G.won = false; G.winPending = false; genLevel(); G.state = 'play'; G.paused = false;
+  G.level = 1; G.score = 0; G.won = false; G.winPending = false; G.gaveUp = false; genLevel(); G.state = 'play'; G.paused = false;
 }
 function nextLevel() {
   G.level++; G.score += 150 * (G.level - 1);
@@ -1431,7 +1431,7 @@ function bankRun() {
 function die() {
   if (G.state === 'dead') return;
   G.state = 'dead'; bankRun(); clearRun();
-  announce(G.won ? 'You carried the Heart out of the dark' : 'Swallowed by the deep', G.won ? '#ffd24a' : '#d9534f');
+  announce(G.won ? 'You carried the Heart out of the dark' : G.gaveUp ? 'You turned back' : 'Swallowed by the deep', G.gaveUp ? '#98a0b3' : G.won ? '#ffd24a' : '#d9534f');
 }
 /* the Heart is down: the run is won, but it is the player's call whether to
    climb out with it or keep going into whatever is below twenty-one */
@@ -4270,6 +4270,14 @@ function syncOpts() {
 $('optMotion').addEventListener('click', () => { reduceMotion = !reduceMotion; META.reduceMotion = reduceMotion; saveMeta(); syncOpts(); });
 $('optVoice').addEventListener('click', () => { voiceOn = !voiceOn; META.voice = voiceOn; saveMeta(); syncOpts(); if (!voiceOn && typeof speechSynthesis !== 'undefined') { try { speechSynthesis.cancel(); } catch (e) {} } });
 $('optMusic').addEventListener('click', () => { musicOn = !musicOn; META.music = musicOn; saveMeta(); syncOpts(); setMix(G.state === 'play'); });
+let giveUpArmed = false;
+$('giveUp').addEventListener('click', e => {
+  if (e && e.stopPropagation) e.stopPropagation();
+  if (!giveUpArmed) { giveUpArmed = true; $('giveUp').textContent = 'Really give up?'; return; }
+  giveUpArmed = false;
+  G.gaveUp = true; G.paused = false; pauseShown = false; $('paused').hidden = true;
+  die();
+});
 $('paused').addEventListener('click', () => { resumeFromPause(); });
 $('resume').addEventListener('click', () => {
   if (!pendingRun) return;
@@ -4292,10 +4300,12 @@ const mmss = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart
 function showOver() {
   const P = G.players[0];
   const won = G.state === 'won';
-  $('oTitle').textContent = won ? 'The Hollow is still.' : G.won ? 'You carried it out of the dark.' : 'Swallowed by the deep.';
+  $('oTitle').textContent = won ? 'The Hollow is still.' : G.won ? 'You carried it out of the dark.'
+    : G.gaveUp ? 'You turned back.' : 'Swallowed by the deep.';
   $('oLine').textContent = won
     ? 'You put down ' + HEART_NAME + ' at depth ' + G.level + '. Climb out with it, or see what lies below.'
-    : 'You reached depth ' + G.level + ' of ' + (G.zone ? G.zone.name : 'the dark') + '.';
+    : (G.gaveUp ? 'You left the dark at depth ' : 'You reached depth ') + G.level +
+      ' of ' + (G.zone ? G.zone.name : 'the dark') + '.';
   $('deeper').hidden = !won;
   const rows = [
     ['Score', G.score + (G.score >= G.best ? '  \u00b7  a new best' : '  \u00b7  best ' + G.best)],
@@ -4386,6 +4396,10 @@ function showPaused() {
   $('pauseS').textContent = sheets.join('   |   ');
   $('pauseExtra').textContent = extras.join('   |   ');
   $('pauseExtra').hidden = extras.length === 0;
+  $('pauseKeys').textContent = btnsOn
+    ? 'Left half of the screen moves you \u00b7 right half aims and attacks \u00b7 the buttons are dash, special and potion.'
+    : 'WASD move \u00b7 mouse aim \u00b7 click or Space attack \u00b7 Shift dash \u00b7 E special \u00b7 F potion \u00b7 P pause.';
+  giveUpArmed = false; $('giveUp').textContent = 'Give up this descent';
   $('pauseHint').textContent = btnsOn ? 'Tap anywhere to carry on.' : 'Press P, or click, to carry on.';
   $('hud').hidden = true;
   $('paused').hidden = false;
