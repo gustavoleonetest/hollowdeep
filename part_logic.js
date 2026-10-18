@@ -1418,9 +1418,22 @@ function updateRevive(dt) {
     if (D.rev >= 1.5) { D.down = false; D.rev = 0; D.hp = D.max * .4; D.inv = 1.5; D.rise = .75; G.fxs.push({ kind: 'shock', x: D.x, y: D.y, t: 0, r: 80, c1: '220,255,200', c2: '155,209,106' }); text(D.x, D.y - 18, 'Revived', '#9bd16a'); burst(D.x, D.y, '#9bd16a', 16, 100); sfx('coin'); }
   }
 }
-function runEchoes() {
-  return Math.max(1, Math.round(G.gold * .25 + G.score / 40 + (G.level - 1) * 8)) * (G.won ? 2 : 1);
+function echoParts() {
+  const g = G.gold * .25, s = G.score / 40, d = Math.max(0, G.level - 1) * 8;
+  const base = Math.max(1, Math.round(g + s + d));
+  const p = { gold: Math.round(g), score: Math.round(s), depth: Math.round(d) };
+  /* three numbers rounded on their own will not always add up to a total
+     rounded once, and a player reading the line will try to add them, so
+     the largest part carries the difference */
+  const drift = base - (p.gold + p.score + p.depth);
+  if (drift) {
+    const big = p.depth >= p.gold && p.depth >= p.score ? 'depth' : p.gold >= p.score ? 'gold' : 'score';
+    p[big] = Math.max(0, p[big] + drift);
+  }
+  p.base = base; p.doubled = !!G.won; p.total = base * (G.won ? 2 : 1);
+  return p;
 }
+function runEchoes() { return echoParts().total; }
 function bankRun() {
   G.best = Math.max(G.best, G.score);
   G.earned = runEchoes();
@@ -4382,6 +4395,17 @@ function showOver() {
   $('oEchLbl').textContent = won ? 'Echoes waiting above' : 'Echoes earned';
   $('oEch').textContent = '+' + (won ? runEchoes() : (G.earned || 0));
   $('oEchTot').textContent = String(META.echoes);
+  {
+    /* where the number came from, so the loop that is meant to bring
+       someone back has at least been described to them once */
+    const p = echoParts(), el = $('oEchHow');
+    if (el) {
+      el.textContent = 'The gold you carried gave ' + p.gold + ', your score ' + p.score +
+        ' and the depth you reached ' + p.depth +
+        (p.doubled ? ', and carrying ' + HEART_NAME + ' out doubled the lot.' : '.') +
+        ' Spend them in the Barrow, and the next delver starts stronger.';
+    }
+  }
   $('over').hidden = false; $('hud').hidden = true;
   (G.state === 'won' ? $('deeper') : $('again')).focus({ preventScroll: true });
 }
