@@ -3721,7 +3721,7 @@ function perfTick(ms) {
   else if (med < 11 && fxLevel > 0) { fxLevel--; p.hold = p.n * 3; }
 }
 const fxThin = () => fxLevel === 0 ? 1 : fxLevel === 1 ? .5 : .25;
-const C = { floorA: '#1a1f2c', floorB: '#1d2333', speck: '#262d40', wall: '#2c3447', wallHi: '#3b455d', face: '#11141c', void: '#0a0c11', door: '#7a4e2a', amber: '#f0a23c', blood: '#d9534f', bone: '#ebe4d2', cyan: '#8fd3ff' };
+const C = { floorA: '#1a1f2c', floorB: '#1d2333', speck: '#262d40', wall: '#2c3447', wallHi: '#3b455d', face: '#11141c', void: '#0a0c11', door: '#7a4e2a', amber: '#f0a23c', blood: '#d9534f', bone: '#ebe4d2', cyan: '#8fd3ff', leaf: '#9bd16a' };
 
 function resize() {
   DPR = Math.min(window.devicePixelRatio || 1, 2); W = stage.clientWidth; H = stage.clientHeight;
@@ -3968,6 +3968,20 @@ function drawMini() {
     mctx.moveTo(a + r, b - r); mctx.lineTo(a - r, b + r);
     mctx.stroke();
   };
+  /* a triangle: the way through, if you can reach it */
+  const markTri = (x, y, c) => {
+    if (!seenAt(x, y)) return;
+    const a = px(x), b = px(y), r = 3;
+    mctx.fillStyle = c;
+    mctx.beginPath(); mctx.moveTo(a, b - r); mctx.lineTo(a + r, b + r - .5); mctx.lineTo(a - r, b + r - .5);
+    mctx.closePath(); mctx.fill();
+  };
+  /* a bar: something to eat, which is the only clock that matters */
+  const markBar = (x, y, c) => {
+    if (!seenAt(x, y)) return;
+    mctx.fillStyle = c;
+    mctx.fillRect(px(x) - 3, px(y) - 1.5, 6, 3);
+  };
   /* a diamond: something to open */
   const markDiamond = (x, y, c) => {
     if (!seenAt(x, y)) return;
@@ -3977,7 +3991,11 @@ function drawMini() {
   };
   markRing(G.exit.x, G.exit.y, C.cyan);
   for (const n of G.nests) markCross(n.x, n.y, C.blood);
-  for (const i of G.items) if (i.kind === 'chest') markDiamond(i.x, i.y, C.amber);
+  for (const i of G.items) {
+    if (i.kind === 'chest') markDiamond(i.x, i.y, C.amber);
+    else if (i.kind === 'key') markTri(i.x, i.y, C.amber);
+    else if (i.kind === 'food') markBar(i.x, i.y, C.leaf);
+  }
   for (const P of G.players) { mctx.strokeStyle = 'rgba(235,228,210,.3)'; mctx.lineWidth = 1; mctx.beginPath(); mctx.arc(px(P.x), px(P.y), 7.5 * s, 0, TAU); mctx.stroke(); }
   /* and you are a square with a pale edge, so you are findable whatever
      delver you took and however you see colour */
