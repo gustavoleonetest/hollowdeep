@@ -3559,6 +3559,21 @@ ok('not to the first', G.players[0].dmgMul === first0);
     btnsOn = was;
     ok('a phone is told about halves of the screen', /Left half/.test(touch), touch.slice(0, 60));
     ok('and a keyboard about keys', /WASD/.test(keys) && !/Left half/.test(keys), keys.slice(0, 60));
+    /* the bar above the stage has handed the reference over, so the sheet
+       has to hold what the bar no longer lists */
+    ok('the sheet carries the keys the bar dropped',
+       /mute/.test(keys) && /narrator/.test(keys) && /music/.test(keys), keys.slice(-70));
+    ok('and the gamepad', /gamepad/.test(keys), keys.slice(-70));
+    ok('a phone is told about those too', /mute/.test(touch) && /gamepad/.test(touch), touch.slice(-60));
+    /* the second delver's keys only matter when there is a second delver */
+    ok('a lone delver is not told about the second one', !/second delver/.test(keys), keys.slice(-60));
+    startGame(['bulwark', 'sable']); G.level = 2; genLevel();
+    G.offer = null; G.offerQ.length = 0; G.state = 'play';
+    btnsOn = false; showPaused();
+    ok('but in co-op the second delver gets their own keys',
+       /second delver/.test($('pauseKeys').textContent) &&
+       /Right Ctrl/.test($('pauseKeys').textContent),
+       $('pauseKeys').textContent.slice(-90));
   }
 
   /* 2. THE TRAP: the overlay resumes on any click, so the button that ends
