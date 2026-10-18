@@ -3902,7 +3902,12 @@ ok('not to the first', G.players[0].dmgMul === first0);
   const elite = (P, aff, dx) => {
     spawnFoe('gloam', P.x + (dx === undefined ? 24 : dx), P.y, true);
     const e = G.enemies[G.enemies.length - 1];
-    e.eaff = [aff];
+    e.eaff = aff ? [aff] : [];
+    /* spawnFoe rolls an elite's own modifiers and has already applied them
+       by the time we get here, so a baseline that happened to roll Extra
+       Fast was already quick and the comparison measured nothing. Put the
+       speed back to an unmodified elite's before applying the one on test. */
+    e.spd = FOES.gloam.spd * (1 + (G.level - 1) * .03) * .93;
     if (aff === 'warded') { e.wardMax = e.max * .45; e.ward = e.wardMax; }
     if (aff === 'fast') e.spd *= 1.55;
     return e;
@@ -3910,7 +3915,7 @@ ok('not to the first', G.players[0].dmgMul === first0);
 
   const PROBES = {
     fast: P => {
-      const plain = (spawnFoe('gloam', P.x + 300, P.y, true), G.enemies[G.enemies.length - 1]).spd;
+      const plain = elite(P, null, 300).spd;
       const quick = elite(P, 'fast', 300).spd;
       return quick > plain * 1.4;
     },
@@ -4001,6 +4006,153 @@ ok('not to the first', G.players[0].dmgMul === first0);
     hurtFoe(e3, 5, 0, false, false, t);
     ok('and the death screen counts it among the creatures', G.tollFoes > 0,
        'creatures took ' + G.tollFoes.toFixed(1));
+  }
+}
+
+/* ---------------- every boon a delver can learn ----------------
+   Sixteen boons, four per delver, offered every few floors and chosen on
+   purpose. `spiny` was a table entry with nothing behind it; these are the
+   biggest table left where the same thing could hide, and reading the code
+   only shows that each id is mentioned somewhere, not that choosing it
+   changes anything.
+
+   So each is driven twice -- once without, once with -- and the difference
+   has to be the thing the boon's own description claims. The list comes
+   from BOONS, so a seventeenth cannot slip in unprobed. */
+{
+  const arena = (cls) => {
+    startGame([cls]); G.level = 5; genLevel();
+    G.offer = null; G.offerQ.length = 0; G.state = 'play';
+    G.enemies.length = 0; G.shots.length = 0; G.eshots.length = 0;
+    G.items.length = 0; G.zones.length = 0; G.hazards.length = 0;
+    const P = G.players[0];
+    P.hp = P.max; P.inv = 0; P.cd = 0; P.boons = {}; P.aim = 0; P.down = false;
+    /* No random crits. A crit is 2.25x and Barbed Shafts is 1.35x, so one
+       lucky roll on either side swamps the thing being measured -- which is
+       how this read "with the boon it hit for less". Ambush is unaffected:
+       its crit comes from the boon, not from this chance. */
+    P.crit = 0; P.up.crit = 0; P.nextCrit = false;
+    /* Floor the ground around the delver. Where the dungeon happens to put
+       a wall is not what any of this is testing, and a bolt stopped by one
+       made two of these checks pass or fail at random. */
+    const tx = Math.floor(P.x / T), ty = Math.floor(P.y / T);
+    for (let y = ty - 5; y <= ty + 5; y++) {
+      for (let x = tx - 6; x <= tx + 6; x++) {
+        if (x > 0 && y > 0 && x < MW - 1 && y < MH - 1) G.map[y * MW + x] = 0;
+      }
+    }
+    G.mapVer++;
+    return P;
+  };
+  const foeAt = (P, dx, dy, alert) => {
+    spawnFoe('gloam', P.x + dx, P.y + (dy || 0), false);
+    const e = G.enemies[G.enemies.length - 1];
+    e.hp = e.max = 9999; e.alert = alert === undefined ? true : alert;
+    return e;
+  };
+  const steps = n => { for (let i = 0; i < (n || 12); i++) update(1 / 60); };
+
+  /* Each probe returns a number; with the boon it must differ from without,
+     in the direction the boon promises. */
+  const PROBES = {
+    /* --- Bulwark, who swings --- */
+    cyclone: ['bulwark', P => { const e = foeAt(P, -34); P.aim = 0; P.cd = 0; attack(P); return 9999 - e.hp; }, 'up'],
+    wake:    ['bulwark', P => { const e = foeAt(P, 30); P.cd = 0; attack(P); return e.burn || 0; }, 'up'],
+    bash:    ['bulwark', P => { const e = foeAt(P, 30); P.cd = 0; attack(P); return e.root || 0; }, 'up'],
+    riposte: ['bulwark', P => { const e = foeAt(P, 30); P.cd = 5; P.inv = 0; hurtPlayer(P, 8, 0, e); return 5 - P.cd; }, 'up'],
+
+    /* --- Ember, who throws fire --- */
+    /* the splinters are born when the bolt bursts and live half a second,
+       so counting at one chosen instant counts whatever happens to be in
+       the air then -- sometimes nothing. Watch the whole flight. */
+    split:   ['ember', P => { foeAt(P, 70); P.cd = 0; attack(P);
+                              let best = 0;
+                              for (let i = 0; i < 40; i++) { update(1 / 60); best = Math.max(best, G.shots.length); }
+                              return best; }, 'up'],
+    /* "bolts bend toward whatever is nearest": the thing to measure is
+       whether it REACHES a foe a straight shot would sail past. Watching
+       the bolt's heading instead read a bolt that had already curved in
+       and burst, and so read nothing at all. */
+    seek:    ['ember', P => { P.aim = 0; const e = foeAt(P, 90, -70); P.cd = 0; attack(P);
+                              steps(40); return 9999 - e.hp; }, 'up'],
+    pyre:    ['ember', P => { foeAt(P, 70); P.cd = 0; attack(P); steps(30); return G.zones.length; }, 'up'],
+    kindle:  ['ember', P => { const e = foeAt(P, 40); e.hp = e.max = 4; P.cd = 0; attack(P); steps(20);
+                              return (G.enemies[0] && G.enemies[0].kindled) || (e.kindled ? 1 : 0); }, 'up'],
+
+    /* --- Sable, who throws daggers --- */
+    fan:     ['sable', P => { P.cd = 0; attack(P); return G.shots.length; }, 'up'],
+    /* a dagger lives half a second, so counting bounces after it has
+       expired counts an empty list: watch while it is still in the air */
+    ric:     ['sable', P => { foeAt(P, 60); foeAt(P, 60, 40); P.cd = 0; attack(P);
+                              let best = 0;
+                              for (let i = 0; i < 40; i++) { update(1 / 60);
+                                for (const s of G.shots) best = Math.max(best, s.bounce || 0); }
+                              return best; }, 'up'],
+    venom:   ['sable', P => { const e = foeAt(P, 60); P.cd = 0; attack(P); steps(30); return e.pois || 0; }, 'up'],
+    /* "an unwary foe" is the condition, and a foe within 140 wakes up on
+       the first update -- so hold it unwary, which is the case the boon
+       is actually about */
+    /* "an unwary foe" is the condition the boon is about, and a foe within
+       140 wakes on the first update -- and wakes DURING it, before the
+       dagger lands, which made this pass or fail by which frame the throw
+       connected. Hold it unwary outright. */
+    ambush:  ['sable', P => { const e = foeAt(P, 60, 0, false);
+                              Object.defineProperty(e, 'alert',
+                                { get: () => false, set: () => {}, configurable: true });
+                              P.cd = 0; attack(P);
+                              const hp = e.hp; steps(30); return hp - e.hp; }, 'up'],
+
+    /* --- Thistle, who looses arrows --- */
+    volley:  ['thistle', P => { P.cd = 0; attack(P); return G.shots.length; }, 'up'],
+    /* "harder with every foe it passes through": the boost lands AFTER a
+       hit, so the first foe feels nothing and the second feels it. Reading
+       the arrow's damage before it has hit anything reads the wrong moment. */
+    barbs:   ['thistle', P => { P.aim = 0; foeAt(P, 60); const second = foeAt(P, 120);
+                                P.cd = 0; attack(P); steps(40);
+                                return 9999 - second.hp; }, 'up'],
+    frost:   ['thistle', P => { const e = foeAt(P, 60); P.cd = 0; attack(P); steps(30); return e.chill || 0; }, 'up'],
+    mark:    ['thistle', P => { const e = foeAt(P, 60); P.cd = 0; attack(P); steps(30); return e.mark || 0; }, 'up'],
+  };
+
+  /* the list cannot fall behind the table */
+  {
+    const all = [];
+    for (const k in BOONS) for (const b of BOONS[k]) all.push(b.id);
+    const unprobed = all.filter(id => !PROBES[id]);
+    const extra = Object.keys(PROBES).filter(id => all.indexOf(id) < 0);
+    ok('every boon a delver can learn is probed here', unprobed.length === 0,
+       unprobed.join(',') || all.length + ' boons');
+    ok('and nothing is probed that no delver can learn', extra.length === 0, extra.join(','));
+  }
+
+  /* each one changes what it says it changes */
+  {
+    const dead = [], backwards = [];
+    for (const id in PROBES) {
+      const [cls, run, want] = PROBES[id];
+      let without, with_;
+      try {
+        const A = arena(cls); without = run(A);
+        const B = arena(cls); B.boons[id] = 1; with_ = run(B);
+      } catch (e) { dead.push(id + ' threw: ' + e.message); continue; }
+      if (Math.abs(with_ - without) < 1e-9) { dead.push(id + ' (both ' + without + ')'); continue; }
+      const right = want === 'up' ? with_ > without : with_ < without;
+      if (!right) backwards.push(id + ': ' + without + ' -> ' + with_);
+    }
+    ok('every boon changes something when it is learned', dead.length === 0,
+       dead.join('; ') || Object.keys(PROBES).length + ' boons, all live');
+    ok('and changes it the way its description promises', backwards.length === 0,
+       backwards.join('; ') || 'all in the promised direction');
+  }
+
+  /* the one that is easiest to be wrong about: a full circle really is one */
+  {
+    const A = arena('bulwark'); const behindA = foeAt(A, -34); A.cd = 0; A.aim = 0; attack(A);
+    const B = arena('bulwark'); B.boons.cyclone = 1;
+    const behindB = foeAt(B, -34); B.cd = 0; B.aim = 0; attack(B);
+    ok('without Cyclone a sweep does not reach behind you', behindA.hp === 9999,
+       'took ' + (9999 - behindA.hp));
+    ok('and with it, it does', behindB.hp < 9999, 'took ' + (9999 - behindB.hp));
   }
 }
 
