@@ -539,14 +539,25 @@ const STAT_LABEL = {
   thorns: v => 'Return ' + Math.round(v * 100) + '% of melee damage',
   gold: v => '+' + Math.round(v * 100) + '% gold',
   drain: v => v > 0 ? 'Your health drains ' + Math.round(v * 100) + '% faster' : 'Your health drains ' + Math.round(-v * 100) + '% slower',
-  elem: v => ({ fire: 'Fire damage: burns, and skeletons fear it', cold: 'Cold damage: chills, and hounds fear it', shock: 'Lightning damage: arcs, and wisps fear it', poison: 'Poison damage: rots, and brutes fear it' })[v],
-  elemDmg: () => null
 };
 function itemLines(it, P) {
   const out = [];
-  for (const k of ['dmg', 'arm', 'hp', 'crit', 'spd', 'cd', 'dash', 'sp', 'leech', 'thorns', 'gold', 'drain', 'elem']) {
+  for (const k of ['dmg', 'arm', 'hp', 'crit', 'spd', 'cd', 'dash', 'sp', 'leech', 'thorns', 'gold', 'drain']) {
     if (it.s[k] === undefined || it.s[k] === 0) continue;
     const t = STAT_LABEL[k] && STAT_LABEL[k](it.s[k]); if (t) out.push(t);
+  }
+  if (it.s.elem) {
+    const el = it.s.elem, nm = ELEM_NAME[el] || el;
+    const share = Math.round((it.s.elemDmg || .4) * 100);
+    out.push(nm.charAt(0).toUpperCase() + nm.slice(1) + ' damage: +' + share +
+             '% of every hit, and ' + (ELEM_VERB[el] || 'it bites'));
+    const f = elemFoes(el), bits = [];
+    if (f.weak.length) bits.push(nameList(f.weak) + ' fear it');
+    if (f.res.length) bits.push(nameList(f.res) + ' shrug it off');
+    if (bits.length) {
+      const line = bits.join('; ');
+      out.push(line.charAt(0).toUpperCase() + line.slice(1));
+    }
   }
   if (it.setName) {
     /* with a delver to ask, say what taking this would actually do */
@@ -697,6 +708,14 @@ function rollBoons(P) {
    carry is a decision rather than a number. */
 const ELEM_COL = { fire: '#ff8a3a', cold: '#8fd3ff', shock: '#c9b6ff', poison: '#9bd16a' };
 const ELEM_NAME = { fire: 'fire', cold: 'cold', shock: 'lightning', poison: 'poison' };
+/* The dungeon had no vocabulary for its own inhabitants: they are keys in a
+   table and nothing ever had to name one out loud. */
+const FOE_NAME = {
+  gloam: 'gloam', wisp: 'wisps', bonewalker: 'bonewalkers', brute: 'brutes',
+  hound: 'hounds', bloat: 'bloats', thief: 'thieves', reaper: 'the reaper',
+  warden: 'wardens'
+};
+const ELEM_VERB = { fire: 'it burns', cold: 'it chills', shock: 'it arcs to others', poison: 'it rots' };
 const AFFIN = {
   gloam: { weak: 'fire', res: 'shock' },
   wisp: { weak: 'shock', res: 'cold' },
@@ -708,6 +727,18 @@ const AFFIN = {
   reaper: { weak: null, res: 'all' },
   warden: { weak: null, res: 'cold' }
 };
+/* Who fears an element and who shrugs it off, read off the same table the
+   damage is read off, so the two cannot disagree. */
+function elemFoes(elem) {
+  const weak = [], res = [];
+  for (const t in AFFIN) {
+    const a = AFFIN[t], nm = FOE_NAME[t] || t;
+    if (a.weak === elem) weak.push(nm);
+    else if (a.res === elem || a.res === 'all') res.push(nm);
+  }
+  return { weak, res };
+}
+const nameList = a => a.length < 2 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
 function elemMul(e, elem) {
   const a = AFFIN[e.type]; if (!a || !elem) return 1;
   if (a.res === 'all' || a.res === elem) return .25;
