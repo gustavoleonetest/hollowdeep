@@ -4539,6 +4539,7 @@ function showLoot() {
       b.addEventListener('click', () => chooseUp(i)); wrap.appendChild(b);
     });
   }
+  $('hud').hidden = true;
   $('loot').hidden = false;
 }
 function chooseUp(i) {
@@ -4548,6 +4549,7 @@ function chooseUp(i) {
   else if (o.kind === 'gear' ? (i !== 0 && i !== 1) : !o.opts[i]) return;
   if (o.kind === 'boon' && !o.opts[i]) return;
   applyUpgrade(i); $('loot').hidden = true; lootShown = false;
+  if (G.state === 'play') $('hud').hidden = false;
 }
 
 /* ---------- loop ---------- */
@@ -4583,7 +4585,11 @@ function frame(now) {
       if (document.body && document.body.classList) document.body.classList.toggle('playing', on);
       try { btnsOn = getComputedStyle($('dashBtn')).display !== 'none'; } catch (e) {}
     } }
-  if (G.state === 'offer' && !lootShown) { lootShown = true; showLoot(); } else if (G.state !== 'offer' && lootShown) { lootShown = false; $('loot').hidden = true; }
+  if (G.state === 'offer' && !lootShown) { lootShown = true; showLoot(); }
+  else if (G.state !== 'offer' && lootShown) {
+    lootShown = false; $('loot').hidden = true;
+    if (G.state === 'play') $('hud').hidden = false;
+  }
   const wantPause = G.paused && G.state === 'play';
   if (wantPause && !pauseShown) { pauseShown = true; showPaused(); }
   else if (!wantPause && pauseShown) {
