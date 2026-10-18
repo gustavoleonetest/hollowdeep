@@ -3997,6 +3997,12 @@ function drawMini() {
     mctx.beginPath(); mctx.moveTo(a, b - r); mctx.lineTo(a + r, b + r - .5); mctx.lineTo(a - r, b + r - .5);
     mctx.closePath(); mctx.fill();
   };
+  /* a disc: an altar, and you are allowed to come back to it */
+  const markDisc = (x, y, c) => {
+    if (!seenAt(x, y)) return;
+    mctx.fillStyle = c;
+    mctx.beginPath(); mctx.arc(px(x), px(y), 2.6, 0, TAU); mctx.fill();
+  };
   /* a bar: something to eat, which is the only clock that matters */
   const markBar = (x, y, c) => {
     if (!seenAt(x, y)) return;
@@ -4016,6 +4022,7 @@ function drawMini() {
     if (i.kind === 'chest') markDiamond(i.x, i.y, C.amber);
     else if (i.kind === 'key') markTri(i.x, i.y, C.amber);
     else if (i.kind === 'food') markBar(i.x, i.y, C.leaf);
+    else if (i.kind === 'shrine') markDisc(i.x, i.y, shrineCol(i.sh));
   }
   for (const P of G.players) { mctx.strokeStyle = 'rgba(235,228,210,.3)'; mctx.lineWidth = 1; mctx.beginPath(); mctx.arc(px(P.x), px(P.y), 7.5 * s, 0, TAU); mctx.stroke(); }
   /* and you are a square with a pale edge, so you are findable whatever

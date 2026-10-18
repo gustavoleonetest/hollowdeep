@@ -3284,6 +3284,7 @@ ok('not to the first', G.players[0].dmgMul === first0);
   const bars = sh => sh.filter(s => s.form === 'rect' && s.w === 6 && s.h === 3);
   const tris = sh => sh.filter(s => s.form === 'poly' && s.pts === 3);
   const diamonds = sh => sh.filter(s => s.form === 'poly' && s.pts === 4);
+  const discs = sh => sh.filter(s => s.form === 'disc');
 
   startGame(['sable']); G.level = 4; genLevel();
   G.offer = null; G.offerQ.length = 0; G.state = 'play';
@@ -3318,6 +3319,7 @@ ok('not to the first', G.players[0].dmgMul === first0);
     const sh = listen(drawMini);
     ok('a key already taken leaves no mark', tris(sh).length === 0, String(tris(sh).length));
     ok('nor does food already eaten', bars(sh).length === 0, String(bars(sh).length));
+    ok('nor an altar already spent', discs(sh).length === 0, String(discs(sh).length));
   }
 
   /* the five marks have five different shapes, so none of them needs its
@@ -3327,6 +3329,8 @@ ok('not to the first', G.players[0].dmgMul === first0);
     G.items.push({ kind: 'key', x: P.x + 40, y: P.y, t: 0 });
     G.items.push({ kind: 'food', x: P.x, y: P.y + 40, t: 0 });
     G.items.push({ kind: 'chest', x: P.x - 40, y: P.y, t: 0, big: false });
+    G.items.push({ kind: 'shrine', x: P.x - 20, y: P.y + 20, t: 0, cool: 0,
+                   sh: { kind: 'pact', pact: PACTS[0] } });
     G.nests.length = 0;
     G.nests.push({ x: P.x, y: P.y - 40, hp: 10, max: 10, r: 12, t: 0, flash: 0 });
     seeAll();
@@ -3337,12 +3341,20 @@ ok('not to the first', G.players[0].dmgMul === first0);
       chest: diamonds(sh).length,
       key: tris(sh).length,
       food: bars(sh).length,
+      shrine: discs(sh).length,
     };
     ok('every kind of thing on the map has its own shape',
-       forms.exit >= 1 && forms.crypt >= 1 && forms.chest === 1 && forms.key === 1 && forms.food === 1,
+       forms.exit >= 1 && forms.crypt >= 1 && forms.chest === 1 && forms.key === 1 &&
+       forms.food === 1 && forms.shrine === 1,
        JSON.stringify(forms));
-    const counts = [forms.chest, forms.key, forms.food];
+    const counts = [forms.chest, forms.key, forms.food, forms.shrine];
     ok('and one of each is drawn once, not twice', counts.every(n => n === 1), counts.join(','));
+    /* the altar is drawn in its own colour, which is the one it has in the
+       world, so the map tells you nothing standing in front of it would not */
+    const disc = discs(sh)[0];
+    ok('and an altar is marked in the colour it is in the world',
+       disc && disc.col === shrineCol({ kind: 'pact' }),
+       disc ? disc.col + ' vs ' + shrineCol({ kind: 'pact' }) : 'no disc');
   }
 
   /* several loaves all get marked: this is a memory, not a hint */
