@@ -1663,6 +1663,13 @@ function useBomb(P) {
 }
 const SP_CD = 9;
 const SPECIALS = { bulwark: 'Shield Slam', ember: 'Fire Nova', sable: 'Shadow Step', thistle: 'Entangle' };
+const SPECIAL_DESC = {
+  bulwark: 'a shield for a moment, everything near you hurled back, and arrows already in the air swept out of it',
+  ember: 'a burst all around you, and ten bolts thrown outward through whatever is left',
+  sable: 'slip forward untouchable, and leave a ring of daggers where you were',
+  thistle: 'roots everything near you to the floor for a few seconds'
+};
+const specialLine = c => SPECIALS[c.key] + ' \u2014 ' + SPECIAL_DESC[c.key] + '.';
 function special(P) {
   if (P.down || P.spCd > 0 || G.state !== 'play') return;
   const c = P.cls, dm = c.dmg * P.dmgMul, a = P.aim, cr = Math.random() < P.crit;
@@ -4235,6 +4242,7 @@ function buildMenu() {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'card'; b.style.setProperty('--c', c.col);
     const lab = ['Health', 'Speed', 'Power'];
     b.innerHTML = '<canvas class="gl" width="96" height="96"></canvas><span class="nm">' + c.name + '</span><span class="bl">' + c.blurb + '</span>' +
+      '<span class="bl sp">Special: ' + specialLine(c) + '</span>' +
       c.m.map((v, i) => '<span class="meter"><span>' + lab[i] + '</span><i style="--v:' + Math.round(v * 100) + '%;--c:' + c.col + '"></i></span>').join('');
     b._cls = c; portrait(c, b); b.addEventListener('click', () => pick(c.key)); wrap.appendChild(b);
   }
@@ -4431,10 +4439,10 @@ function showPaused() {
     }
     const boons = (BOONS[P.cls.key] || []).filter(b => bn(P, b.id)).map(b => b.name);
     const pacts = (P.pacts || []).map(q => q.name);
-    const bits = [];
+    const bits = ['Special: ' + specialLine(P.cls)];
     if (boons.length) bits.push('Boons: ' + boons.join(', '));
     if (pacts.length) bits.push('Pacts: ' + pacts.join(', '));
-    if (bits.length) extras.push(who + bits.join('  \u00b7  '));
+    extras.push(who + bits.join('  \u00b7  '));
   }
   $('pauseS').textContent = sheets.join('   |   ');
   $('pauseExtra').textContent = extras.join('   |   ');
